@@ -1,7 +1,38 @@
 {% extends 'base.html' %} {% block content %}
-<h1>expenditures</h1>
-<hr />
+<h1>Expenditures</h1>
+{% if expenditures %}
 <div class="row">
-  <div class="col-md-4 offset-md-4"></div>
+  <table class="table">
+    <thead>
+      <tr>
+        <th scope="col">id</th>
+        <th scope="col">name</th>
+        <th scope="col">type</th>
+        <th scope="col">frequency</th>
+        <th scope="col">value</th>
+        <th scope="col">start date</th>
+        <th scope="col">end date</th>
+        <th scope="col">interval</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for expenditure in expenditures %}
+      <tr>
+        <td>
+          <a href="/home/expenditures/manage/{{ expenditure.expense_id }}">
+            {{ expenditure.expense_id }}</a
+          >
+        </td>
+        <td>{{ expenditure.name }}</td>
+        <td>{{ expenditure.type }}</td>
+        <td>{{ expenditure.frequency }}</td>
+        <td>{{ expenditure.value }}</td>
+        <td>{{ expenditure.start_date }}</td>
+        <td>{{ expenditure.end_date }}</td>
+        <td>{{ expenditure.interval }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
-{% endblock %}
+{% endif %} {% endblock %}

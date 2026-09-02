@@ -1,0 +1,14 @@
+{% extends 'base.html' %} {% block content %}
+<h1>Welcome {{ request.state.sub }} 😎</h1>
+<hr />
+<div class="row">
+  <div class="col-md-4 offset-md-4">
+    <p>Options below to get started:</p>
+    <ul>
+      <li><a href="/home/expenditures">View expenditures</a></li>
+      <li><a href="/home/expenditures/manage">Manage expenditures</a></li>
+      <li><a href="/home/forecast">Forecast expenditures</a></li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

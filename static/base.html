@@ -13,16 +13,19 @@
   </head>
   <body>
     <div class="container">
-      {% if request.state.breadcrumbs %} {{ request.state.breadcrumb }} 
       <nav class="navbar navbar-expand-lg navbar-light bg-light ml-2">
-        {% for breadcrumb in request.state.breadcrumbs %}
-          <span>&nbsp;/&nbsp;<a href="{{ breadcrumb.url }}">{{ breadcrumb.name }}</a></span>
-        {% endfor %} 
+        {% if request.state.breadcrumbs %} {% for breadcrumb in
+        request.state.breadcrumbs %}
+        <span
+          >&nbsp;/&nbsp;<a href="{{ breadcrumb.url }}"
+            >{{ breadcrumb.name }}</a
+          ></span
+        >
+        {% endfor %} {% else %}
+        <span>&nbsp;</span>
+        {% endif %}
       </nav>
-      <hr /> 
-      {% endif %}
-      {% block content %}
-      {% endblock %}
+      {% block content %} {% endblock %}
     </div>
   </body>
 </html>
