@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from passlib.context import CryptContext
-from utils.functions import decode_token, create_token, breadcrumbs, cursor, execute_db
+from utils.functions import decode_token, create_token, breadcrumbs, cursor, execute_db, insert_expenditure
 
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -97,14 +97,6 @@ async def home(request: Request):
     )
 
 
-@app.get("/home/expenditures/manage", response_class=HTMLResponse, dependencies=[Depends(decode_token)])
-async def welcome(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="manage-expenditures.html",
-    )
-
-
 @app.get("/home/expenditures", response_class=HTMLResponse, dependencies=[Depends(decode_token)])
 async def welcome(request: Request):
     select_user_id = "select user_id from users where username=%s;"
@@ -112,11 +104,8 @@ async def welcome(request: Request):
     execute_db(select_user_id, (request.state.sub,))
     user_id = cursor.fetchone()["user_id"]
 
-    select_expenditures = "select expense_id,name,type,frequency,\
-        value,start_date,end_date,interval from expenditures where user_id=%s;"
-
+    select_expenditures = "select expenditure_id,substring(created::varchar,0,11) as created,name,type,value,frequency from expenditures where user_id=%s;"
     execute_db(select_expenditures, (user_id,))
-
     expenditures = cursor.fetchall()
 
     return templates.TemplateResponse(
@@ -126,53 +115,118 @@ async def welcome(request: Request):
     )
 
 
-@app.get("/home/expenditures/manage/{expenditure_id}", response_class=HTMLResponse, dependencies=[Depends(decode_token)])
-async def welcome(request: Request, expenditure_id: int):
-    select_user_id = "select user_id from users where username=%s;"
-
-    execute_db(select_user_id, (request.state.sub,))
-    user_id = cursor.fetchone()["user_id"]
-
-    select_expenditure = "select expense_id,name,type,frequency,\
-        value,start_date,end_date,interval from expenditures where \
-        user_id=%s and expense_id=%s;"
-
-    execute_db(select_expenditure, (user_id, expenditure_id))
-
-    expenditure = cursor.fetchone()
-    print(expenditure)
-
+@app.get("/home/expenditures/one-off", response_class=HTMLResponse, dependencies=[Depends(decode_token)])
+async def daily_expenditure(request: Request):
     return templates.TemplateResponse(
         request=request,
-        name="manage-expenditures.html",
-        context={"expenditure": expenditure}
+        name="manage-one-off-expenditure.html",
     )
 
 
-@app.post("/home/expenditures/manage", response_class=HTMLResponse, dependencies=[Depends(decode_token)])
-async def welcome(request: Request):
+@app.post("/home/expenditures/one-off", response_class=HTMLResponse, dependencies=[Depends(decode_token)])
+async def daily_expenditure(request: Request):
     payload = await request.form()
-    select_user_id = "select user_id from users where username=%s;"
+    expenditure_id = insert_expenditure(payload, request.state.sub, "one-off")
 
-    execute_db(select_user_id, (request.state.sub,))
-    user_id = cursor.fetchone()["user_id"]
+    insert_one_off = "insert into one_offs (expenditure_id,occur_date) values (%s,%s);"
+    execute_args = (expenditure_id, payload["occur_date"])
+    execute_db(insert_one_off, execute_args)
 
-    match payload["frequency"]:
-        case "one-off":
-            one_off_insert = "insert into expenditures (user_id,name,type,frequency,value\
-                ,start_date) values (%s,%s,%s,%s,%s,%s);"
-            execute_db(one_off_insert, (user_id, payload["name"], payload["type"],
-                       payload["frequency"], payload["value"], payload["start_date"]))
-        case "daily":
-            end_date = payload["end_date"] if len(
-                payload["end_date"]) > 0 else None
-            interval = payload["interval"] if len(
-                payload["interval"]) > 0 else None
+    return RedirectResponse(
+        "/home/expenditures",
+        status_code=302)
 
-            daily_insert = "insert into expenditures (user_id,name,type,frequency,value,\
-                start_date,end_date,interval) values (%s,%s,%s,%s,%s,%s,%s,%s);"
-            execute_db(daily_insert, (user_id, payload["name"], payload["type"],
-                       payload["frequency"], payload["value"], payload["start_date"], end_date, interval))
+
+@app.get("/home/expenditures/daily", response_class=HTMLResponse, dependencies=[Depends(decode_token)])
+async def daily_expenditure(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="manage-daily-expenditure.html",
+    )
+
+
+@app.post("/home/expenditures/daily", response_class=HTMLResponse, dependencies=[Depends(decode_token)])
+async def create_daily_expenditure(request: Request):
+    payload = await request.form()
+
+    expenditure_id = insert_expenditure(payload, request.state.sub, "daily")
+
+    end_date = payload["end_date"] if len(payload["end_date"]) > 0 else None
+    skip = payload["skip"] if len(payload["skip"]) > 0 else None
+
+    insert_daily = "insert into dailys (expenditure_id,start_date,end_date,skip) values (%s,%s,%s,%s);"
+    execute_args = (expenditure_id, payload["start_date"], end_date, skip)
+    execute_db(insert_daily, execute_args)
+
+    return RedirectResponse(
+        "/home/expenditures",
+        status_code=302)
+
+
+@app.get("/home/expenditures/weekly", response_class=HTMLResponse, dependencies=[Depends(decode_token)])
+async def daily_expenditure(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="manage-weekly-expenditure.html",
+    )
+
+
+@app.post("/home/expenditures/weekly", response_class=HTMLResponse, dependencies=[Depends(decode_token)])
+async def daily_expenditure(request: Request):
+    payload = await request.form()
+
+    expenditure_id = insert_expenditure(payload, request.state.sub, "weekly")
+
+    end_date = payload["end_date"] if len(payload["end_date"]) > 0 else None
+    skip = payload["skip"] if len(payload["skip"]) > 0 else None
+
+    insert_weekly = "insert into weeklys (expenditure_id,start_date,end_date,skip) values (%s,%s,%s,%s) returning weekly_id;"
+    execute_args = (expenditure_id, payload["start_date"], end_date, skip)
+    execute_db(insert_weekly, execute_args)
+
+    weekly_id = cursor.fetchone()["weekly_id"]
+    weekly_days = payload.getlist("weekly_days")
+
+    insert_weekly_days = "insert into weekly_days (weekly_id,week_day) values"
+    insert_days = ",".join(["(%s,%s)" % (weekly_id, day)
+                           for day in weekly_days])
+    insert_command = "%s %s;" % (insert_weekly_days, insert_days)
+    execute_db(insert_command)
+
+    return RedirectResponse(
+        "/home/expenditures",
+        status_code=302)
+
+
+@app.get("/home/expenditures/monthly", response_class=HTMLResponse, dependencies=[Depends(decode_token)])
+async def daily_expenditure(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="manage-monthly-expenditure.html",
+    )
+
+
+@app.post("/home/expenditures/monthly", response_class=HTMLResponse, dependencies=[Depends(decode_token)])
+async def daily_expenditure(request: Request):
+    payload = await request.form()
+
+    expenditure_id = insert_expenditure(payload, request.state.sub, "monthly")
+
+    end_date = payload["end_date"] if len(payload["end_date"]) > 0 else None
+    skip = payload["skip"] if len(payload["skip"]) > 0 else None
+
+    insert_monthly = "insert into monthlys (expenditure_id,start_date,end_date,skip) values (%s,%s,%s,%s) returning monthly_id;"
+    execute_args = (expenditure_id, payload["start_date"], end_date, skip)
+    execute_db(insert_monthly, execute_args)
+
+    monthly_id = cursor.fetchone()["monthly_id"]
+    monthly_days = payload.getlist("monthly_days")
+
+    insert_monthly_days = "insert into monthly_days (monthly_id,month_day) values"
+    insert_days = ",".join(["(%s,%s)" % (monthly_id, day)
+                           for day in monthly_days])
+    insert_command = "%s %s;" % (insert_monthly_days, insert_days)
+    execute_db(insert_command)
 
     return RedirectResponse(
         "/home/expenditures",

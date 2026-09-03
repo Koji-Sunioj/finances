@@ -1,0 +1,68 @@
+{% extends 'base.html' %} {% block content %}
+<h1 style="text-align: center">Submit Daily expenditure</h1>
+<hr />
+<div class="row">
+  <div class="col-md-4 offset-md-4">
+    <form action="/home/expenditures/daily" method="POST">
+      <div class="form-group">
+        <label for="value">name:</label>
+        <input
+          type="text"
+          id="name"
+          class="form-control"
+          name="name"
+          placeholder="rent, tomatos, shampoo....."
+          required
+        />
+      </div>
+      <div class="form-group">
+        <label for="value">value:</label>
+        <input
+          type="number"
+          id="value"
+          class="form-control"
+          name="value"
+          placeholder="9.38"
+          step="0.01"
+          min="0"
+          max="10000"
+          required
+        />
+      </div>
+      <div class="form-group">
+        <label for="frequency">type:</label>
+        <select class="form-control" id="expenditure" name="type" required>
+          <option value="expense">expense</option>
+          <option value="deposit">deposit</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="skip">skips every n days:</label>
+        <input type="number" id="skip" class="form-control" name="skip" />
+      </div>
+      <div class="form-group">
+        <label for="start_date">start date</label>
+        <input
+          type="date"
+          id="start_date"
+          class="form-control"
+          name="start_date"
+          min="{{ request.state.max_date }}"
+          required
+        />
+      </div>
+      <div class="form-group">
+        <label for="end_date">end date (leave empty for no end)</label>
+        <input
+          type="date"
+          id="end_date"
+          class="form-control"
+          name="end_date"
+          min="{{ request.state.max_date }}"
+        />
+      </div>
+      <button type="submit" class="btn btn-primary">Submit</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

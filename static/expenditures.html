@@ -6,30 +6,40 @@
     <thead>
       <tr>
         <th scope="col">id</th>
+        <th scope="col">created</th>
         <th scope="col">name</th>
-        <th scope="col">type</th>
         <th scope="col">frequency</th>
+        <th scope="col">type</th>
         <th scope="col">value</th>
-        <th scope="col">start date</th>
-        <th scope="col">end date</th>
-        <th scope="col">interval</th>
       </tr>
     </thead>
     <tbody>
       {% for expenditure in expenditures %}
       <tr>
         <td>
-          <a href="/home/expenditures/manage/{{ expenditure.expense_id }}">
-            {{ expenditure.expense_id }}</a
+          {% if expenditure.frequency == "daily" %}
+          <a href="/home/expenditures/daily/{{ expenditure.expenditure_id }}">
+            {{ expenditure.expenditure_id }}</a
           >
+          {% elif expenditure.frequency == "monthly" %}
+          <a href="/home/expenditures/monthly/{{ expenditure.expenditure_id }}">
+            {{ expenditure.expenditure_id }}</a
+          >
+          {% elif expenditure.frequency == "one-off" %}
+          <a href="/home/expenditures/one-off/{{ expenditure.expenditure_id }}">
+            {{ expenditure.expenditure_id }}</a
+          >
+          {% elif expenditure.frequency == "weekly" %}
+          <a href="/home/expenditures/weekly/{{ expenditure.expenditure_id }}">
+            {{ expenditure.expenditure_id }}</a
+          >
+          {% endif %}
         </td>
+        <td>{{ expenditure.created }}</td>
         <td>{{ expenditure.name }}</td>
-        <td>{{ expenditure.type }}</td>
         <td>{{ expenditure.frequency }}</td>
+        <td>{{ expenditure.type }}</td>
         <td>{{ expenditure.value }}</td>
-        <td>{{ expenditure.start_date }}</td>
-        <td>{{ expenditure.end_date }}</td>
-        <td>{{ expenditure.interval }}</td>
       </tr>
       {% endfor %}
     </tbody>
