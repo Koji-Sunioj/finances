@@ -10,3 +10,8 @@ body {
 	background-color: white !important;
 	padding-bottom: 20px !important;
 }
+
+form {
+	margin-bottom: 7px !important;
+}
+

@@ -1,8 +1,9 @@
 {% extends 'base.html' %} {% block content %}
 <div class="row">
-  <div class="col-md-4 offset-md-4">
+  <div class="col">
     <div class="alert alert-danger mt-2" role="alert">
-      you are not authorized
+      <p>error code: {{ status_code }}</p>
+      <p>transaction: {{ error_string }}</p>
     </div>
   </div>
 </div>

@@ -1,12 +1,16 @@
 {% extends 'base.html' %} {% block content %}
-<h1>Welcome {{ request.state.sub }} 😎</h1>
+<h1 style="text-align: center">Welcome {{ request.state.sub }} 😎</h1>
 <hr />
 <div class="row">
-  <div class="col-md-4 offset-md-4">
+  <div class="col-md-4 offset-md-4 border rounded-1">
     <p>Options below to get started:</p>
     <ul>
       <li><a href="/home/forecast">Forecast expenditures</a></li>
-      <li><a href="/home/expenditures">View expenditures</a></li>
+      <li>
+        <a href="/home/expenditures?sort=starting&direction=ascending"
+          >View expenditures</a
+        >
+      </li>
       <li>Manage expenditures</li>
       <ul>
         <li><a href="/home/expenditures/daily">daily</a></li>

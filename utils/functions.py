@@ -3,8 +3,8 @@ import os
 import psycopg2
 import psycopg2.extras
 
-from functools import wraps
 from jose import jwt
+from functools import wraps
 from traceback import format_exc
 from fastapi import Request, HTTPException
 from datetime import datetime, timedelta, timezone, date
@@ -21,15 +21,38 @@ conn = psycopg2.connect(
 cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
 
+def tx(function):
+    @wraps(function)
+    async def transaction(*args, **kwargs):
+        try:
+            executed = await function(*args, **kwargs)
+            conn.commit()
+            return executed
+        except Exception as error:
+            conn.rollback()
+            print("error type: %s" % error.__class__.__name__)
+            print(format_exc())
+
+            has_detail = hasattr(error, 'detail')
+            has_error_code = hasattr(error, 'status_code')
+
+            status_code = error.status_code if has_error_code else 400
+            detail = error.detail if has_detail else "an error occurred"
+
+            raise HTTPException(status_code=status_code, detail=detail)
+
+    return transaction
+
+
 def insert_expenditure(payload, username, frequency):
     select_user_id = "select user_id from users where username=%s;"
-    execute_db(select_user_id, (username,))
+    cursor = execute_db(select_user_id, (username,))
     user_id = cursor.fetchone()["user_id"]
 
     insert_expenditure = "insert into expenditures (user_id,name,type,value,frequency) values (%s,%s,%s,%s,%s) returning expenditure_id;"
     execute_args = (user_id, payload["name"],
                     payload["type"], payload["value"], frequency)
-    execute_db(insert_expenditure, execute_args)
+    cursor = execute_db(insert_expenditure, execute_args)
 
     expenditure_id = cursor.fetchone()["expenditure_id"]
     return expenditure_id
@@ -39,6 +62,7 @@ def execute_db(command, args=None):
     try:
         cursor.execute(command, args)
         conn.commit()
+        return cursor
     except Exception as error:
         print(format_exc(error))
         conn.rollback()
@@ -53,8 +77,11 @@ def breadcrumbs(url):
     breadcrumbs = []
 
     for breadcrumb in uris:
+        uri_name = breadcrumb
+        if "?" in breadcrumb:
+            uri_name = ", ".join(breadcrumb.replace("?", ", ").split("&"))
         breadcrumbs.append(
-            {"url": uri[0:uri.index(breadcrumb)+len(breadcrumb)], "name": breadcrumb})
+            {"url": uri[0:uri.index(breadcrumb)+len(breadcrumb)], "name": uri_name})
 
     return breadcrumbs
 

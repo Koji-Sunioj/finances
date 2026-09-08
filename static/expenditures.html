@@ -1,46 +1,72 @@
 {% extends 'base.html' %} {% block content %}
 <h1>Expenditures</h1>
-{% if expenditures %}
+{% if expenditures %} {% set navigation =
+{'ascending':'descending','descending':'ascending'} %} {% set nextquery
+="/home/expenditures/?sort=%s&direction=" % (sort,) + navigation[direction] %}
+{% set headers
+=['created','name','frequency','starting','ending','type','value','interval','dates']
+%} {% set direction_icon = {'ascending':'\U0001F446','descending':'U0001F447'}
+%}
 <div class="row">
   <table class="table">
     <thead>
       <tr>
-        <th scope="col">id</th>
-        <th scope="col">created</th>
-        <th scope="col">name</th>
-        <th scope="col">frequency</th>
-        <th scope="col">type</th>
-        <th scope="col">value</th>
+        {% for header in headers %} {% if header == sort%}
+        <th scope="col">
+          <a
+            href="{{ nextquery }}"
+            class="link-secondary link-underline link-underline-opacity-0"
+            >{{header}} {{direction_icon[direction]}}</a
+          >
+        </th>
+        {% else %}
+        <th scope="col">
+          <a
+            href="/home/expenditures/?sort={{header}}&direction=ascending"
+            class="link-secondary link-underline link-underline-opacity-0"
+            >{{header}}</a
+          >
+        </th>
+        {% endif %} {% endfor %}
       </tr>
     </thead>
     <tbody>
       {% for expenditure in expenditures %}
       <tr>
+        <td>{{ expenditure.created }}</td>
         <td>
           {% if expenditure.frequency == "daily" %}
           <a href="/home/expenditures/daily/{{ expenditure.expenditure_id }}">
-            {{ expenditure.expenditure_id }}</a
+            {{ expenditure.name }}</a
           >
           {% elif expenditure.frequency == "monthly" %}
           <a href="/home/expenditures/monthly/{{ expenditure.expenditure_id }}">
-            {{ expenditure.expenditure_id }}</a
+            {{ expenditure.name }}</a
           >
           {% elif expenditure.frequency == "one-off" %}
           <a href="/home/expenditures/one-off/{{ expenditure.expenditure_id }}">
-            {{ expenditure.expenditure_id }}</a
+            {{ expenditure.name }}</a
           >
           {% elif expenditure.frequency == "weekly" %}
           <a href="/home/expenditures/weekly/{{ expenditure.expenditure_id }}">
-            {{ expenditure.expenditure_id }}</a
+            {{ expenditure.name }}</a
           >
           {% endif %}
         </td>
-        <td>{{ expenditure.created }}</td>
-        <td>{{ expenditure.name }}</td>
         <td>{{ expenditure.frequency }}</td>
+        <td>{{ expenditure.starting }}</td>
+        <td>
+          {% if expenditure.ending and expenditure.frequency in
+          ['daily','monthly','weekly'] %} {{ expenditure.ending }} {% endif %}
+        </td>
         <td>{{ expenditure.type }}</td>
         <td>{{ expenditure.value }}</td>
+        <td>
+          {% if expenditure.interval %} {{ expenditure.interval }} {% endif %}
+        </td>
+        <td>{% if expenditure.dates %} {{ expenditure.dates }} {% endif %}</td>
       </tr>
+
       {% endfor %}
     </tbody>
   </table>

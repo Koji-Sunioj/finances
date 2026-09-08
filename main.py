@@ -1,27 +1,12 @@
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi import FastAPI, Request, APIRouter
-from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.exceptions import HTTPException
 
 from routes.home import home
 from routes.expenditures import expenditures
 
 from templates import templates
-from functools import wraps
-
-
-def something(function):
-    @wraps(function)
-    async def transaction(*args, **kwargs):
-        try:
-            print("asd")
-            executed = await function(*args, **kwargs)
-            return executed
-        except Exception as error:
-            print(error)
-
-    return transaction
-
 
 app = FastAPI()
 root = APIRouter()
@@ -33,19 +18,14 @@ app.include_router(root)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-@app.exception_handler(StarletteHTTPException)
+@app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
-    match exc.status_code:
-        case 403:
-            return templates.TemplateResponse(
-                request=request,
-                name="403.html"
-            )
-        case _:
-            return templates.TemplateResponse(
-                request=request,
-                name="404.html"
-            )
+    print("template")
+    return templates.TemplateResponse(
+        request=request,
+        name="error.html",
+        context={"status_code": exc.status_code, "error_string": exc.detail}
+    )
 
 
 @root.get("/", response_class=HTMLResponse)
@@ -56,4 +36,5 @@ async def sign_in(request: Request, alert: str = None, username: str = None):
             name="sign-in.html",
             context={"username": username, "alert": alert},
         )
-    return templates.TemplateResponse(request=request, name="sign-in.html")
+    else:
+        return templates.TemplateResponse(request=request, name="sign-in.html")
