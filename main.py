@@ -20,7 +20,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
-    print("template")
     return templates.TemplateResponse(
         request=request,
         name="error.html",

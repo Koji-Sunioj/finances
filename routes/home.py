@@ -47,18 +47,15 @@ async def authenticate(request: Request):
         case "unauthorized":
             return RedirectResponse(
                 "/?alert=unauthorized&username=%s" % payload["username"],
-                status_code=302)
+                status_code=303)
 
         case "authenticated" | "new-user":
             token_string = create_token(payload["username"])
             request.state.sub = payload["username"]
             request.state.breadcrumbs = breadcrumbs(str(request.url))
-            return templates.TemplateResponse(
-                request=request,
-                name="home.html",
-                headers={"Set-Cookie": token_string},
-                context={"username": payload["username"]},
-            )
+            return RedirectResponse(
+                "/home",
+                status_code=303,headers={"Set-Cookie": token_string})
 
 
 @home.get("/", response_class=HTMLResponse, dependencies=[Depends(decode_token)])
