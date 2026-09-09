@@ -19,16 +19,14 @@ async def get_expenditures(request: Request, sort: str = "starting", direction: 
         raise HTTPException(
             status_code=400, detail="invalid search parameters")
 
-    direction_pointers = {"ascending": "asc", "descending": "desc"}
-
-    sort_by = "order by %s %s;" % (sort, direction_pointers[direction])
-
     select_user_id = "select user_id from users where username=%s;"
     cursor = execute_db(select_user_id, (request.state.sub,))
     user_id = cursor.fetchone()["user_id"]
 
-    select_expenditures = "select \
-        expenditures.expenditure_id, \
+    direction_pointers = {"ascending": "asc", "descending": "desc"}
+    sort_by = "order by %s %s" % (sort, direction_pointers[direction])
+
+    select_expenditures = f"select * from (select expenditures.expenditure_id, \
         substring(created::varchar,0,11) as created, \
         name, type, value, frequency, \
         coalesce(one_offs.occur_date, weeklys.start_date,monthlys.start_date,dailys.start_date) starting, \
@@ -46,7 +44,10 @@ async def get_expenditures(request: Request, sort: str = "starting", direction: 
         left join weekly_days on weekly_days.weekly_id = weeklys.weekly_id \
         left join dailys on dailys.expenditure_id = expenditures.expenditure_id \
     where user_id = %s \
-    group by expenditures.expenditure_id, starting, ending, interval " + sort_by
+    group by expenditures.expenditure_id, starting, ending, interval {sort_by}) expenditure_values where \
+    (expenditure_values.frequency = 'one-off' and expenditure_values.starting >= current_date) or \
+	(expenditure_values.frequency != 'one-off' and expenditure_values.ending >= current_date) or \
+	(expenditure_values.frequency != 'one-off' and expenditure_values.starting >= current_date and expenditure_values.ending is null);" 
 
     cursor = execute_db(select_expenditures, (user_id,))
     expenditures = cursor.fetchall()
