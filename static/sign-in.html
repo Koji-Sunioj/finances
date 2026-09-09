@@ -3,7 +3,7 @@
 <hr />
 <div class="row">
   <div class="col-md-4 offset-md-4 border rounded-1">
-    <form action="/home" method="POST">
+    <form action="/" method="POST">
       <div class="form-group">
         <label for="username">username:</label>
         <input
@@ -32,7 +32,7 @@
       </div>
       <button type="submit" class="btn btn-primary">Submit</button>
     </form>
-    {% if alert == "unauthorized" %}
+    {% if error_code == 401 %}
     <div class="alert alert-danger mt-2" role="alert">
       invalid credentials for username {{ username }} 🙅
     </div>

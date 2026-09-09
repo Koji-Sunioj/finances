@@ -4,6 +4,7 @@
 
 body {
 	background-color: rgb(241, 208, 186) !important;
+	overflow-y: scroll !important;
 }
 
 .container {

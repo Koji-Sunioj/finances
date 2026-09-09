@@ -64,7 +64,7 @@ def execute_db(command, args=None):
         conn.commit()
         return cursor
     except Exception as error:
-        print(format_exc(error))
+        print(format_exc())
         conn.rollback()
 
 
@@ -72,16 +72,20 @@ def breadcrumbs(url):
     uri_pattern = re.search(
         r"(?<=http:\/\/localhost:8000).+", url)
     uri = uri_pattern.group(0)
-    uris = [crumb for crumb in uri.split("/") if len(crumb) > 0]
+    uris = [re.sub(r"\?.+", "", crumb)
+            for crumb in uri.split("/") if len(crumb) > 0]
 
     breadcrumbs = []
+    with_query = {"expenditures": "?sort=starting&direction=ascending"}
 
     for breadcrumb in uris:
-        uri_name = breadcrumb
-        if "?" in breadcrumb:
-            uri_name = ", ".join(breadcrumb.replace("?", ", ").split("&"))
+        full_url = uri[0:uri.index(breadcrumb)+len(breadcrumb)]
+
+        if breadcrumb in with_query:
+            full_url += with_query[breadcrumb]
+
         breadcrumbs.append(
-            {"url": uri[0:uri.index(breadcrumb)+len(breadcrumb)], "name": uri_name})
+            {"url": full_url, "name": breadcrumb})
 
     return breadcrumbs
 
@@ -103,8 +107,13 @@ def decode_token(request: Request):
             case "/home/expenditures/daily" | "/home/expenditures/one-off" | "/home/expenditures/weekly":
                 request.state.max_date = date.today().isoformat()
     except Exception as error:
-        print(error)
-        raise HTTPException(status_code=403)
+
+        has_module = hasattr(error, "__module__")
+
+        if has_module and error.__module__ == "jose.exceptions":
+            raise HTTPException(status_code=403)
+        else:
+            raise HTTPException(status_code=400)
 
 
 def create_token(username):

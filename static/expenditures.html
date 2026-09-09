@@ -5,17 +5,18 @@
 ="/home/expenditures/?sort=%s&direction=" % (sort,) + navigation[direction] %}
 {% set headers
 =['created','name','frequency','starting','ending','type','value','interval','dates']
-%} {% set direction_icon = {'ascending':'\U0001F446','descending':'U0001F447'}
+%} {% set direction_icon = {'ascending':'\U0001F446','descending':'\U0001F447'}
 %}
 <div class="row">
   <table class="table">
     <thead>
       <tr>
         {% for header in headers %} {% if header == sort%}
-        <th scope="col">
+        <th scope="col" style="background-color: rgb(248, 249, 250);">
           <a
             href="{{ nextquery }}"
-            class="link-secondary link-underline link-underline-opacity-0"
+            class="link-warning link-underline link-underline-opacity-0"
+            
             >{{header}} {{direction_icon[direction]}}</a
           >
         </th>
