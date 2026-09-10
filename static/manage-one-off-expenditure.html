@@ -1,9 +1,17 @@
-{% extends 'base.html' %} {% block content %}
+{% extends 'base.html' %} {% block content %} {% if expenditure_id %}
+<h1 style="text-align: center">
+  Edit One-time expenditure {{ expenditure_id }}
+</h1>
+{% else %}
 <h1 style="text-align: center">Submit One-time expenditure</h1>
+{% endif %} {% set expenditure_types = ["expense","deposit"] %}
 <hr />
 <div class="row">
   <div class="col-md-4 offset-md-4 border rounded-1">
-    <form action="/home/expenditures/one-off" method="POST">
+    <form
+      action="/home/expenditures/one-off/{{ expenditure_id }}"
+      method="POST"
+    >
       <div class="form-group">
         <label for="value">name:</label>
         <input
@@ -12,6 +20,7 @@
           class="form-control"
           name="name"
           placeholder="rent, tomatos, shampoo....."
+          value="{{ name }}"
           required
         />
       </div>
@@ -26,14 +35,19 @@
           step="0.01"
           min="0"
           max="10000"
+          value="{{ value }}"
           required
         />
       </div>
       <div class="form-group">
         <label for="frequency">type:</label>
         <select class="form-control" id="expenditure" name="type" required>
-          <option value="expense">expense</option>
-          <option value="deposit">deposit</option>
+          {% for expenditure in expenditure_types %} {% if expenditure == type
+          %}
+          <option value="{{ expenditure }}" selected>{{ expenditure }}</option>
+          {% else %}
+          <option value="{{ expenditure }}">{{ expenditure }}</option>
+          {% endif %} {% endfor %}
         </select>
       </div>
       <div class="form-group">
@@ -44,11 +58,20 @@
           class="form-control"
           name="occur_date"
           min="{{ request.state.max_date }}"
+          value="{{ occur_date }}"
           required
         />
       </div>
       <button type="submit" class="btn btn-primary">Submit</button>
     </form>
+    {% if expenditure_id %}
+    <form
+      action="/home/expenditures/one-off/{{expenditure_id}}/delete"
+      method="POST"
+    >
+      <button type="submit" class="btn btn-danger">Delete</button>
+    </form>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

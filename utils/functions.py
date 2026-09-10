@@ -33,78 +33,75 @@ def tx(function):
             print("error type: %s" % error.__class__.__name__)
             print(format_exc())
 
-            has_detail = hasattr(error, 'detail')
-            has_error_code = hasattr(error, 'status_code')
+            has_detail = hasattr(error, "detail")
+            has_error_code = hasattr(error, "status_code")
 
             status_code = error.status_code if has_error_code else 400
-            detail = error.detail if has_detail else "an error occurred"
+            detail = None
+
+            match error.__class__.__name__:
+                case "UniqueViolation":
+                    detail = "that value already exists"
+                case _:
+                    detail = error.detail if has_detail else "an error occurred"
 
             raise HTTPException(status_code=status_code, detail=detail)
 
     return transaction
 
 
-def insert_expenditure(payload, username, frequency):
-    select_user_id = "select user_id from users where username=%s;"
-    cursor = execute_db(select_user_id, (username,))
-    user_id = cursor.fetchone()["user_id"]
-
+def insert_expenditure(payload, user_id, frequency):
     insert_expenditure = "insert into expenditures (user_id,name,type,value,frequency) values (%s,%s,%s,%s,%s) returning expenditure_id;"
-    execute_args = (user_id, payload["name"],
-                    payload["type"], payload["value"], frequency)
-    cursor = execute_db(insert_expenditure, execute_args)
+    execute_args = (
+        user_id,
+        payload["name"],
+        payload["type"],
+        payload["value"],
+        frequency,
+    )
 
+    cursor.execute(insert_expenditure, execute_args)
     expenditure_id = cursor.fetchone()["expenditure_id"]
     return expenditure_id
 
 
-def execute_db(command, args=None):
-    try:
-        cursor.execute(command, args)
-        conn.commit()
-        return cursor
-    except Exception as error:
-        print(format_exc())
-        conn.rollback()
-
-
 def breadcrumbs(url):
-    uri_pattern = re.search(
-        r"(?<=http:\/\/localhost:8000).+", url)
+    uri_pattern = re.search(r"(?<=http:\/\/localhost:8000).+", url)
     uri = uri_pattern.group(0)
-    uris = [re.sub(r"\?.+", "", crumb)
-            for crumb in uri.split("/") if len(crumb) > 0]
+    uris = [re.sub(r"\?.+", "", crumb) for crumb in uri.split("/") if len(crumb) > 0]
 
     breadcrumbs = []
     with_query = {"expenditures": "?sort=starting&direction=ascending"}
 
     for breadcrumb in uris:
-        full_url = uri[0:uri.index(breadcrumb)+len(breadcrumb)]
+        full_url = uri[0 : uri.index(breadcrumb) + len(breadcrumb)]
 
         if breadcrumb in with_query:
             full_url += with_query[breadcrumb]
 
-        breadcrumbs.append(
-            {"url": full_url, "name": breadcrumb})
+        breadcrumbs.append({"url": full_url, "name": breadcrumb})
 
     return breadcrumbs
 
 
 def decode_token(request: Request):
     try:
-        uri_pattern = re.search(
-            r"(?<=http:\/\/localhost:8000).+", str(request.url))
+        uri_pattern = re.search(r"(?<=http:\/\/localhost:8000).+", str(request.url))
         uri = uri_pattern.group(0)
 
-        token_pattern = re.search(
-            r"token=(.+?)(?=;|$)", request.headers["cookie"])
+        token_pattern = re.search(r"token=(.+?)(?=;|$)", request.headers["cookie"])
         jwt_payload = jwt.decode(token_pattern.group(1), key=fe_key)
 
         request.state.sub = jwt_payload["sub"]
         request.state.breadcrumbs = breadcrumbs(str(request.url))
+        request.state.user_id = jwt_payload["user_id"]
 
         match uri:
-            case "/home/expenditures/daily" | "/home/expenditures/one-off" | "/home/expenditures/weekly":
+            case (
+                "/home/expenditures/daily"
+                | "/home/expenditures/one-off"
+                | "/home/expenditures/weekly"
+            ):
                 request.state.max_date = date.today().isoformat()
     except Exception as error:
 
@@ -116,12 +113,13 @@ def decode_token(request: Request):
             raise HTTPException(status_code=400)
 
 
-def create_token(username):
+def create_token(username, user_id):
     now = datetime.now(timezone.utc)
     expires = now + timedelta(minutes=180)
 
     jwt_payload = {
         "sub": username,
+        "user_id": user_id,
         "iat": now,
         "exp": expires,
     }
