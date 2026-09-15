@@ -1,4 +1,5 @@
-{% extends 'base.html' %} {% block content %}
+{% extends 'base.html' %} 
+{% block content %}
 <h1 style="text-align: center">Submit Weekly expenditure</h1>
 <hr />
 <div class="row">
@@ -56,7 +57,7 @@
       </div>
       <div class="form-group">
         <label for="skip">skips every n weeks:</label>
-        <input type="number" id="skip" class="form-control" name="skip" />
+        <input type="number" id="skip" class="form-control" name="skip" min="1" />
       </div>
       <div class="form-group">
         <label for="start_date">start date</label>

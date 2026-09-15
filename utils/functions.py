@@ -51,7 +51,8 @@ def tx(function):
 
 
 def insert_expenditure(payload, user_id, frequency):
-    insert_expenditure = "insert into expenditures (user_id,name,type,value,frequency) values (%s,%s,%s,%s,%s) returning expenditure_id;"
+    insert_expenditure = "insert into expenditures (user_id,name,type,value,frequency) values (%s,%s,%s,%s,%s) \
+        returning expenditure_id, name, type;"
     execute_args = (
         user_id,
         payload["name"],
@@ -61,8 +62,30 @@ def insert_expenditure(payload, user_id, frequency):
     )
 
     cursor.execute(insert_expenditure, execute_args)
-    expenditure_id = cursor.fetchone()["expenditure_id"]
-    return expenditure_id
+    return cursor.fetchone()
+
+def update_expenditure(payload,user_id,expenditure_id):
+    update_expenditure = "update expenditures set modified=%s,name=%s,type=%s,value=%s where user_id=%s and expenditure_id=%s \
+        returning expenditure_id, name, type;"
+    cursor.execute(
+        update_expenditure,
+        (
+            datetime.now(),
+            payload["name"],
+            payload["type"],
+            payload["value"],
+            user_id,
+            expenditure_id,
+        ),
+    )
+    return cursor.fetchone()
+
+def delete_expenditure(user_id, expenditure_id):
+    delete_expenditure = "delete from expenditures where user_id = %s and expenditure_id = %s \
+        returning expenditure_id, name, type"
+    cursor.execute(delete_expenditure,(user_id,expenditure_id))
+    return cursor.fetchone()
+
 
 
 def breadcrumbs(url):
@@ -96,13 +119,11 @@ def decode_token(request: Request):
         request.state.breadcrumbs = breadcrumbs(str(request.url))
         request.state.user_id = jwt_payload["user_id"]
 
-        match uri:
-            case (
-                "/home/expenditures/daily"
-                | "/home/expenditures/one-off"
-                | "/home/expenditures/weekly"
-            ):
-                request.state.max_date = date.today().isoformat()
+        has_form = re.search(r"\/home\/expenditures\/(?=weekly|daily|one\-off|monthly)",uri)
+
+        if has_form:
+            request.state.max_date = date.today().isoformat()
+                
     except Exception as error:
 
         has_module = hasattr(error, "__module__")
