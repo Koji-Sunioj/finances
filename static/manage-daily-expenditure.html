@@ -11,7 +11,10 @@
 <hr />
 <div class="row">
   <div class="col-md-4 offset-md-4 border rounded-1">
-      <form action="/home/expenditures/daily/{{ expenditure_id }}" method="POST">
+    <form 
+      action="/home/expenditures/daily/{{ expenditure_id }}" 
+      method="POST"
+    >
       <div class="form-group">
         <label for="value">name:</label>
         <input
@@ -42,12 +45,12 @@
       <div class="form-group">
         <label for="frequency">type:</label>
         <select class="form-control" id="expenditure" name="type" required>
-          {% for expenditure in expenditure_types %} 
-            {% if expenditure == type %}
-              <option value="{{ expenditure }}" selected>{{ expenditure }}</option>
-            {% else %}
-              <option value="{{ expenditure }}">{{ expenditure }}</option>
-            {% endif %} 
+        {% for expenditure in expenditure_types %} 
+          {% if expenditure == type %}
+            <option value="{{ expenditure }}" selected>{{ expenditure }}</option>
+          {% else %}
+            <option value="{{ expenditure }}">{{ expenditure }}</option>
+          {% endif %} 
         {% endfor %}
         </select>
       </div>
@@ -79,15 +82,15 @@
         />
       </div>
       <button type="submit" class="btn btn-primary">Submit</button>
+  </form>
+  {% if expenditure_id %}
+    <form
+      action="/home/expenditures/{{ expenditure_id }}/delete"
+      method="POST"
+    >
+      <button type="submit" class="btn btn-danger">Delete</button>
     </form>
-    {% if expenditure_id %}
-      <form
-        action="/home/expenditures/daily/{{expenditure_id}}/delete"
-        method="POST"
-      >
-        <button type="submit" class="btn btn-danger">Delete</button>
-      </form>
-    {% endif %}
+  {% endif %}
   </div>
 </div>
 {% endblock %}

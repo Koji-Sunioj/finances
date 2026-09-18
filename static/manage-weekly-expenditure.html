@@ -1,18 +1,29 @@
 {% extends 'base.html' %} 
 {% block content %}
-<h1 style="text-align: center">Submit Weekly expenditure</h1>
+{% if expenditure_id %}
+  <h1 style="text-align: center">
+    Edit Weekly expenditure {{ expenditure_id }}
+  </h1>
+{% else %}
+  <h1 style="text-align: center">Submit Weekly expenditure</h1>
+{% endif %} 
+{% set expenditure_types = ["expense","deposit"] %}
 <hr />
 <div class="row">
   <div class="col-md-4 offset-md-4 border rounded-1">
-    <form action="/home/expenditures/weekly" method="POST">
+    <form 
+      action="/home/expenditures/weekly/{{ expenditure_id }}" 
+      method="POST"
+    >
       <div class="form-group">
-        <label for="value">name:</label>
+        <label for="name">name:</label>
         <input
           type="text"
           id="name"
           class="form-control"
           name="name"
           placeholder="rent, tomatos, shampoo....."
+          value="{{ name }}"
           required
         />
       </div>
@@ -27,14 +38,20 @@
           step="0.01"
           min="0"
           max="10000"
+          value="{{ value }}"
           required
         />
       </div>
       <div class="form-group">
         <label for="frequency">type:</label>
         <select class="form-control" id="expenditure" name="type" required>
-          <option value="expense">expense</option>
-          <option value="deposit">deposit</option>
+          {% for expenditure in expenditure_types %} 
+            {% if expenditure == type %}
+              <option value="{{ expenditure }}" selected>{{ expenditure }}</option>
+            {% else %}
+              <option value="{{ expenditure }}">{{ expenditure }}</option>
+            {% endif %} 
+          {% endfor %}
         </select>
       </div>
       <div class="form-group">
@@ -46,18 +63,18 @@
           required
           multiple
         >
-          <option value="0">Monday</option>
-          <option value="1">Tuesday</option>
-          <option value="2">Wednesday</option>
-          <option value="3">Thursday</option>
-          <option value="4">Friday</option>
-          <option value="5">Saturday</option>
-          <option value="6">Sunday</option>
+          {% for day in week_days %}
+            {% if day.selected %}
+              <option value="{{ day.value }}" selected>{{ day.name }}</option>
+            {% else %}
+              <option value="{{ day.value }}">{{ day.name }}</option>
+            {% endif %}
+          {% endfor %}
         </select>
       </div>
       <div class="form-group">
         <label for="skip">skips every n weeks:</label>
-        <input type="number" id="skip" class="form-control" name="skip" min="1" />
+        <input type="number" id="skip" class="form-control" name="skip" value="{{ skip }}" min="1" />
       </div>
       <div class="form-group">
         <label for="start_date">start date</label>
@@ -66,6 +83,7 @@
           id="start_date"
           class="form-control"
           name="start_date"
+          value="{{ start_date }}"
           min="{{ request.state.max_date }}"
           required
         />
@@ -77,11 +95,20 @@
           id="end_date"
           class="form-control"
           name="end_date"
+          value="{{ end_date }}"
           min="{{ request.state.max_date }}"
         />
       </div>
       <button type="submit" class="btn btn-primary">Submit</button>
     </form>
+    {% if expenditure_id %}
+    <form
+      action="/home/expenditures/{{ expenditure_id }}/delete"
+      method="POST"
+    >
+      <button type="submit" class="btn btn-danger">Delete</button>
+    </form>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

@@ -1,12 +1,13 @@
 {% extends 'base.html' %} 
 {% block content %} 
 {% if expenditure_id %}
-<h1 style="text-align: center">
-  Edit One-time expenditure {{ expenditure_id }}
-</h1>
+  <h1 style="text-align: center">
+    Edit One-time expenditure {{ expenditure_id }}
+  </h1>
 {% else %}
   <h1 style="text-align: center">Submit One-time expenditure</h1>
-{% endif %} {% set expenditure_types = ["expense","deposit"] %}
+{% endif %} 
+{% set expenditure_types = ["expense","deposit"] %}
 <hr />
 <div class="row">
   <div class="col-md-4 offset-md-4 border rounded-1">
@@ -68,12 +69,12 @@
       <button type="submit" class="btn btn-primary">Submit</button>
     </form>
     {% if expenditure_id %}
-    <form
-      action="/home/expenditures/one-off/{{expenditure_id}}/delete"
-      method="POST"
-    >
-      <button type="submit" class="btn btn-danger">Delete</button>
-    </form>
+      <form
+        action="/home/expenditures/{{ expenditure_id }}/delete"
+        method="POST"
+      >
+        <button type="submit" class="btn btn-danger">Delete</button>
+      </form>
     {% endif %}
   </div>
 </div>

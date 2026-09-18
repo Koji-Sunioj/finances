@@ -2,15 +2,23 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi import Request, Depends, APIRouter, HTTPException
 
 from templates import templates
-from utils.functions import decode_token, insert_expenditure, tx, cursor, update_expenditure, delete_expenditure
-
-from datetime import datetime
+from utils.functions import (
+    decode_token, 
+    insert_expenditure, 
+    tx, 
+    cursor, 
+    update_expenditure, 
+    delete_expenditure, 
+    week_days, 
+    month_days
+)
 
 expenditures = APIRouter(
     prefix="/home/expenditures", dependencies=[Depends(decode_token)]
 )
 
-#the table
+# the table
+
 
 @expenditures.get("", response_class=HTMLResponse)
 @tx
@@ -78,7 +86,7 @@ async def get_expenditures(
     )
 
 
-#one-off
+# one-off
 
 @expenditures.get("/one-off", response_class=HTMLResponse)
 async def one_off_form(request: Request):
@@ -90,12 +98,11 @@ async def one_off_form(request: Request):
 
 @expenditures.get("/one-off/{expenditure_id}", response_class=HTMLResponse)
 async def get_one_off_item(request: Request, expenditure_id: int):
-    select_one_off = "select expenditures.expenditure_id,occur_date::varchar,modified::varchar,name,type,value from one_offs \
-            join expenditures on expenditures.expenditure_id = one_offs.expenditure_id where user_id = %s and expenditures.expenditure_id = %s;"
+    select_one_off = "select expenditures.expenditure_id,occur_date::varchar,modified::varchar,name,type,\
+        value from one_offs join expenditures on expenditures.expenditure_id = one_offs.expenditure_id \
+        where frequency = 'one-off' user_id = %s and expenditures.expenditure_id = %s;"
     cursor.execute(select_one_off, (request.state.user_id, expenditure_id))
     one_off = cursor.fetchone()
-    print(cursor.query)
-    print(one_off)
 
     return templates.TemplateResponse(
         request=request, name="manage-one-off-expenditure.html", context=one_off
@@ -112,7 +119,7 @@ async def create_one_off(request: Request):
     insert_one_off = "insert into one_offs (expenditure_id,occur_date) values (%s,%s);"
     execute_args = (expenditure["expenditure_id"], payload["occur_date"])
     cursor.execute(insert_one_off, execute_args)
- 
+
     message = "expenditure %s: %s with type %s created" % (
         expenditure["expenditure_id"],
         expenditure["name"],
@@ -129,7 +136,7 @@ async def create_one_off(request: Request):
 async def update_one_off_item(request: Request, expenditure_id: int):
     payload = await request.form()
 
-    result = update_expenditure(payload,request.state.user_id,expenditure_id)
+    result = update_expenditure(payload, request.state.user_id, expenditure_id)
 
     update_one_off = "update one_offs set occur_date=%s from expenditures where expenditures.expenditure_id = one_offs.expenditure_id \
             and one_offs.expenditure_id =%s and expenditures.user_id = %s;"
@@ -148,7 +155,8 @@ async def update_one_off_item(request: Request, expenditure_id: int):
         status_code=303,
     )
 
-#dailys
+# dailys
+
 
 @expenditures.get("/daily", response_class=HTMLResponse)
 async def get_daily_expenditure(request: Request):
@@ -157,14 +165,15 @@ async def get_daily_expenditure(request: Request):
         name="manage-daily-expenditure.html",
     )
 
+
 @expenditures.get("/daily/{expenditure_id}", response_class=HTMLResponse)
 @tx
-async def daily_item(request: Request,expenditure_id:str):
-    print(vars(request.state))
+async def daily_item(request: Request, expenditure_id: str):
     select_daily = "select expenditures.expenditure_id,modified,name,type,value,start_date,end_date,skip from expenditures \
-            join dailys on dailys.expenditure_id = expenditures.expenditure_id where user_id = %s and expenditures.expenditure_id = %s;"
+            join dailys on dailys.expenditure_id = expenditures.expenditure_id where frequency = 'daily' and user_id = %s \
+            and expenditures.expenditure_id = %s;"
 
-    cursor.execute(select_daily,(request.state.user_id, expenditure_id))
+    cursor.execute(select_daily, (request.state.user_id, expenditure_id))
     daily = cursor.fetchone()
 
     return templates.TemplateResponse(
@@ -172,6 +181,7 @@ async def daily_item(request: Request,expenditure_id:str):
         name="manage-daily-expenditure.html",
         context=daily
     )
+
 
 @expenditures.post("/daily", response_class=HTMLResponse)
 @tx
@@ -182,10 +192,12 @@ async def create_daily_expenditure(request: Request):
         payload, request.state.user_id, "daily")
 
     end_date = payload["end_date"] if len(payload["end_date"]) > 0 else None
-    skip = payload["skip"] if len(payload["skip"]) > 0 and int(payload["skip"]) > 1 else None
+    skip = payload["skip"] if len(payload["skip"]) > 0 and int(
+        payload["skip"]) > 1 else None
 
     insert_daily = "insert into dailys (expenditure_id,start_date,end_date,skip) values (%s,%s,%s,%s);"
-    execute_args = (expenditure["expenditure_id"], payload["start_date"], end_date, skip)
+    execute_args = (expenditure["expenditure_id"],
+                    payload["start_date"], end_date, skip)
     cursor.execute(insert_daily, execute_args)
 
     message = "expenditure %s: %s with type %s created" % (
@@ -199,23 +211,26 @@ async def create_daily_expenditure(request: Request):
         status_code=303,
     )
 
+
 @expenditures.post("/daily/{expenditure_id}", response_class=HTMLResponse)
 @tx
-async def update_daily_item(request: Request,expenditure_id:str):
+async def update_daily_item(request: Request, expenditure_id: str):
     payload = await request.form()
 
-    result = update_expenditure(payload,request.state.user_id,expenditure_id)
+    result = update_expenditure(payload, request.state.user_id, expenditure_id)
 
     update_daily = "update dailys set start_date = %s, end_date = %s, skip = %s from expenditures \
             where expenditures.expenditure_id = dailys.expenditure_id \
             and expenditures.user_id = %s \
             and expenditures.expenditure_id = %s;"
 
-    skip = payload["skip"] if len(payload["skip"]) > 0 and int(payload["skip"]) > 1 else None
+    skip = payload["skip"] if len(payload["skip"]) > 0 and int(
+        payload["skip"]) > 1 else None
     end_date = payload["end_date"] if len(payload["end_date"]) == 10 else None
 
-    cursor.execute(update_daily,(payload["start_date"],end_date,skip,request.state.user_id,expenditure_id))
-    
+    cursor.execute(update_daily, (payload["start_date"],
+                   end_date, skip, request.state.user_id, expenditure_id))
+
     message = "expenditure %s: %s with type %s updated" % (
         expenditure_id,
         result["name"],
@@ -227,13 +242,43 @@ async def update_daily_item(request: Request,expenditure_id:str):
     )
 
 
-#weekly
+# weekly
 
 @expenditures.get("/weekly", response_class=HTMLResponse)
 async def get_weekly_expenditure(request: Request):
     return templates.TemplateResponse(
         request=request,
+        context={"week_days": week_days()},
         name="manage-weekly-expenditure.html",
+    )
+
+
+@expenditures.get("/weekly/{expenditure_id}", response_class=HTMLResponse)
+@tx
+async def weekly_item(request: Request, expenditure_id: str):
+    select_weekly = "select expenditures.expenditure_id,modified,name,type,value, \
+        start_date,end_date,json_agg(week_day) as days,skip from expenditures \
+        join weeklys on weeklys.expenditure_id = expenditures.expenditure_id \
+        join weekly_days on weekly_days.weekly_id = weeklys.weekly_id  \
+        where expenditures.frequency = 'weekly' and user_id = %s and expenditures.expenditure_id = %s \
+        group by expenditures.expenditure_id,weeklys.weekly_id;"
+
+    cursor.execute(select_weekly, (request.state.user_id, expenditure_id))
+    weekly = cursor.fetchone()
+
+    form_week_days = week_days()
+
+    for week_day in form_week_days:
+        for expenditure_day in weekly["days"]:
+            if expenditure_day == week_day["value"]:
+                week_day["selected"] = True
+
+    weekly["week_days"] = form_week_days
+
+    return templates.TemplateResponse(
+        request=request,
+        name="manage-weekly-expenditure.html",
+        context=weekly
     )
 
 
@@ -246,18 +291,20 @@ async def create_weekly_expenditure(request: Request):
         payload, request.state.user_id, "weekly")
 
     end_date = payload["end_date"] if len(payload["end_date"]) > 0 else None
-    skip = payload["skip"] if len(payload["skip"]) > 0 and int(payload["skip"]) > 1 else None
+    skip = payload["skip"] if len(payload["skip"]) > 0 and int(
+        payload["skip"]) >= 1 else None
 
     insert_weekly = "insert into weeklys (expenditure_id,start_date,end_date,skip) values (%s,%s,%s,%s) returning weekly_id;"
-    execute_args = (expenditure["expenditure_id"], payload["start_date"], end_date, skip)
+    execute_args = (expenditure["expenditure_id"],
+                    payload["start_date"], end_date, skip)
     cursor.execute(insert_weekly, execute_args)
 
     weekly_id = cursor.fetchone()["weekly_id"]
-    weekly_days = payload.getlist("weekly_days")
+    form_days = payload.getlist("weekly_days")
 
     insert_weekly_days = "insert into weekly_days (weekly_id,week_day) values"
     insert_days = ",".join(["(%s,%s)" % (weekly_id, day)
-                           for day in weekly_days])
+                           for day in form_days])
     insert_command = "%s %s;" % (insert_weekly_days, insert_days)
     cursor.execute(insert_command)
 
@@ -272,40 +319,38 @@ async def create_weekly_expenditure(request: Request):
         status_code=303,
     )
 
-#monthly
 
-@expenditures.get("/monthly", response_class=HTMLResponse)
-async def get_monthly_expenditure(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="manage-monthly-expenditure.html",
-    )
-
-
-@expenditures.post("/monthly", response_class=HTMLResponse)
+@expenditures.post("/weekly/{expenditure_id}", response_class=HTMLResponse)
 @tx
-async def created_monthly_expenditure(request: Request):
+async def update_weekly_item(request: Request, expenditure_id: str):
     payload = await request.form()
 
-    expenditure = insert_expenditure(
-        payload, request.state.user_id, "monthly")
+    expenditure = update_expenditure(
+        payload, request.state.user_id, expenditure_id)
 
     end_date = payload["end_date"] if len(payload["end_date"]) > 0 else None
-    skip = payload["skip"] if len(payload["skip"]) > 0 and int(payload["skip"]) > 1 else None
+    skip = payload["skip"] if len(payload["skip"]) > 0 and int(
+        payload["skip"]) >= 1 else None
 
-    insert_monthly = "insert into monthlys (expenditure_id,start_date,end_date,skip) values (%s,%s,%s,%s) returning monthly_id;"
-    execute_args = (expenditure["expenditure_id"], payload["start_date"], end_date, skip)
-    cursor.execute(insert_monthly, execute_args)
+    update_weekly = "update weeklys set start_date = %s, end_date = %s, skip = %s from expenditures \
+        where expenditures.expenditure_id = weeklys.expenditure_id \
+        and expenditures.user_id = %s \
+        and expenditures.expenditure_id = %s returning weekly_id;"
 
-    monthly_id = cursor.fetchone()["monthly_id"]
-    monthly_days = payload.getlist("monthly_days")
+    cursor.execute(update_weekly, (payload["start_date"],
+                   end_date, skip, request.state.user_id, expenditure_id))
+    weekly_id = cursor.fetchone()["weekly_id"]
 
-    insert_monthly_days = "insert into monthly_days (monthly_id,month_day) values"
-    insert_days = ",".join(["(%s,%s)" % (monthly_id, day)
-                           for day in monthly_days])
-    insert_command = "%s %s;" % (insert_monthly_days, insert_days)
+    delete_weekdays = "delete from weekly_days where weekly_id = %s;"
+    cursor.execute(delete_weekdays, (weekly_id,))
+
+    form_days = payload.getlist("weekly_days")
+
+    insert_weekly_days = "insert into weekly_days (weekly_id,week_day) values"
+    insert_days = ",".join(["(%s,%s)" % (weekly_id, day)
+                           for day in form_days])
+    insert_command = "%s %s;" % (insert_weekly_days, insert_days)
     cursor.execute(insert_command)
-
 
     message = "expenditure %s: %s with type %s created" % (
         expenditure["expenditure_id"],
@@ -318,14 +363,134 @@ async def created_monthly_expenditure(request: Request):
         status_code=303,
     )
 
-#delete from forms
 
-@expenditures.post("/one-off/{expenditure_id}/delete", response_class=HTMLResponse)
-@expenditures.post("/daily/{expenditure_id}/delete", response_class=HTMLResponse)
-@expenditures.post("/weekly/{expenditure_id}/delete", response_class=HTMLResponse)
-@expenditures.post("/monthly/{expenditure_id}/delete", response_class=HTMLResponse)
+# monthly
+
+@expenditures.get("/monthly", response_class=HTMLResponse)
+async def get_monthly_expenditure(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        context={"month_days": month_days()},
+        name="manage-monthly-expenditure.html",
+    )
+
+
+@expenditures.get("/monthly/{expenditure_id}", response_class=HTMLResponse)
+@tx
+async def monthly_item(request: Request, expenditure_id: str):
+    select_monthly = "select expenditures.expenditure_id,modified,name,type,value,\
+        frequency,start_date,end_date,skip,json_agg(month_day) as days from expenditures \
+        join monthlys on monthlys.expenditure_id = expenditures.expenditure_id \
+        join monthly_days on monthly_days.monthly_id = monthlys.monthly_id \
+        where expenditures.frequency = 'monthly' and user_id = %s and expenditures.expenditure_id = %s \
+        group by expenditures.expenditure_id, monthlys.monthly_id;"
+
+    cursor.execute(select_monthly, (request.state.user_id, expenditure_id))
+    monthly = cursor.fetchone()
+
+    form_month_days = month_days()
+
+    for month_day in form_month_days:
+        for expenditure_day in monthly["days"]:
+            if expenditure_day == month_day["value"]:
+                month_day["selected"] = True
+
+    monthly["month_days"] = form_month_days
+
+    return templates.TemplateResponse(
+        request=request,
+        name="manage-monthly-expenditure.html",
+        context=monthly
+    )
+
+
+@expenditures.post("/monthly", response_class=HTMLResponse)
+@tx
+async def created_monthly_expenditure(request: Request):
+    payload = await request.form()
+
+    expenditure = insert_expenditure(
+        payload, request.state.user_id, "monthly")
+
+    end_date = payload["end_date"] if len(payload["end_date"]) > 0 else None
+    skip = payload["skip"] if len(payload["skip"]) > 0 and int(
+        payload["skip"]) > 1 else None
+
+    insert_monthly = "insert into monthlys (expenditure_id,start_date,end_date,skip) values (%s,%s,%s,%s) returning monthly_id;"
+    execute_args = (expenditure["expenditure_id"],
+                    payload["start_date"], end_date, skip)
+    cursor.execute(insert_monthly, execute_args)
+
+    monthly_id = cursor.fetchone()["monthly_id"]
+    monthly_days = payload.getlist("monthly_days")
+
+    insert_monthly_days = "insert into monthly_days (monthly_id,month_day) values"
+    insert_days = ",".join(["(%s,%s)" % (monthly_id, day)
+                           for day in monthly_days])
+    insert_command = "%s %s;" % (insert_monthly_days, insert_days)
+    cursor.execute(insert_command)
+
+    message = "expenditure %s: %s with type %s created" % (
+        expenditure["expenditure_id"],
+        expenditure["name"],
+        expenditure["type"],
+    )
+
+    return RedirectResponse(
+        "/home/expenditures?sort=starting&direction=ascending&message=%s" % message,
+        status_code=303,
+    )
+
+
+@expenditures.post("/monthly/{expenditure_id}", response_class=HTMLResponse)
+@tx
+async def update_monthly_item(request: Request, expenditure_id: str):
+    payload = await request.form()
+
+    expenditure = update_expenditure(
+        payload, request.state.user_id, expenditure_id)
+
+    end_date = payload["end_date"] if len(payload["end_date"]) > 0 else None
+    skip = payload["skip"] if len(payload["skip"]) > 0 and int(
+        payload["skip"]) >= 1 else None
+
+    update_weekly = "update monthlys set start_date = %s, end_date = %s, skip = %s from expenditures \
+        where expenditures.expenditure_id = monthlys.expenditure_id \
+        and expenditures.user_id = %s \
+        and expenditures.expenditure_id = %s returning monthly_id;"
+
+    cursor.execute(update_weekly, (payload["start_date"],
+                   end_date, skip, request.state.user_id, expenditure_id))
+    monthly_id = cursor.fetchone()["monthly_id"]
+
+    delete_monthdays = "delete from monthly_days where monthly_id = %s;"
+    cursor.execute(delete_monthdays, (monthly_id,))
+
+    form_days = payload.getlist("monthly_days")
+
+    insert_weekly_days = "insert into monthly_days (monthly_id,month_day) values"
+    insert_days = ",".join(["(%s,%s)" % (monthly_id, day)
+                           for day in form_days])
+    insert_command = "%s %s;" % (insert_weekly_days, insert_days)
+    cursor.execute(insert_command)
+
+    message = "expenditure %s: %s with type %s created" % (
+        expenditure["expenditure_id"],
+        expenditure["name"],
+        expenditure["type"],
+    )
+
+    return RedirectResponse(
+        "/home/expenditures?sort=starting&direction=ascending&message=%s" % message,
+        status_code=303,
+    )
+
+# delete from forms
+
+
+@expenditures.post("/{expenditure_id}/delete", response_class=HTMLResponse)
 async def delete_one_off_item(request: Request, expenditure_id: int):
-    expenditure = delete_expenditure(request.state.user_id,expenditure_id) 
+    expenditure = delete_expenditure(request.state.user_id, expenditure_id)
     message = "expenditure %s: %s with type %s deleted" % (
         expenditure_id,
         expenditure["name"],

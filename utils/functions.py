@@ -21,6 +21,19 @@ conn = psycopg2.connect(
 cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
 
+def week_days():
+    return [{"name": "Monday", "value": 0, "selected": False}, {"name": "Tuesday", "value": 1, "selected": False},
+            {"name": "Wednesday", "value": 2, "selected": False}, {
+                "name": "Thursday", "value": 3, "selected": False},
+            {"name": "Friday", "value": 4, "selected": False}, {
+                "name": "Saturday", "value": 5, "selected": False},
+            {"name": "Sunday", "value": 6, "selected": False}]
+
+
+def month_days():
+    return [{"value": n, "selected": False} for n in range(1, 32)]
+
+
 def tx(function):
     @wraps(function)
     async def transaction(*args, **kwargs):
@@ -64,7 +77,8 @@ def insert_expenditure(payload, user_id, frequency):
     cursor.execute(insert_expenditure, execute_args)
     return cursor.fetchone()
 
-def update_expenditure(payload,user_id,expenditure_id):
+
+def update_expenditure(payload, user_id, expenditure_id):
     update_expenditure = "update expenditures set modified=%s,name=%s,type=%s,value=%s where user_id=%s and expenditure_id=%s \
         returning expenditure_id, name, type;"
     cursor.execute(
@@ -80,24 +94,25 @@ def update_expenditure(payload,user_id,expenditure_id):
     )
     return cursor.fetchone()
 
+
 def delete_expenditure(user_id, expenditure_id):
     delete_expenditure = "delete from expenditures where user_id = %s and expenditure_id = %s \
         returning expenditure_id, name, type"
-    cursor.execute(delete_expenditure,(user_id,expenditure_id))
+    cursor.execute(delete_expenditure, (user_id, expenditure_id))
     return cursor.fetchone()
-
 
 
 def breadcrumbs(url):
     uri_pattern = re.search(r"(?<=http:\/\/localhost:8000).+", url)
     uri = uri_pattern.group(0)
-    uris = [re.sub(r"\?.+", "", crumb) for crumb in uri.split("/") if len(crumb) > 0]
+    uris = [re.sub(r"\?.+", "", crumb)
+            for crumb in uri.split("/") if len(crumb) > 0]
 
     breadcrumbs = []
     with_query = {"expenditures": "?sort=starting&direction=ascending"}
 
     for breadcrumb in uris:
-        full_url = uri[0 : uri.index(breadcrumb) + len(breadcrumb)]
+        full_url = uri[0: uri.index(breadcrumb) + len(breadcrumb)]
 
         if breadcrumb in with_query:
             full_url += with_query[breadcrumb]
@@ -109,21 +124,24 @@ def breadcrumbs(url):
 
 def decode_token(request: Request):
     try:
-        uri_pattern = re.search(r"(?<=http:\/\/localhost:8000).+", str(request.url))
+        uri_pattern = re.search(
+            r"(?<=http:\/\/localhost:8000).+", str(request.url))
         uri = uri_pattern.group(0)
 
-        token_pattern = re.search(r"token=(.+?)(?=;|$)", request.headers["cookie"])
+        token_pattern = re.search(
+            r"token=(.+?)(?=;|$)", request.headers["cookie"])
         jwt_payload = jwt.decode(token_pattern.group(1), key=fe_key)
 
         request.state.sub = jwt_payload["sub"]
         request.state.breadcrumbs = breadcrumbs(str(request.url))
         request.state.user_id = jwt_payload["user_id"]
 
-        has_form = re.search(r"\/home\/expenditures\/(?=weekly|daily|one\-off|monthly)",uri)
+        has_form = re.search(
+            r"\/home\/expenditures\/(?=weekly|daily|one\-off|monthly)", uri)
 
         if has_form:
             request.state.max_date = date.today().isoformat()
-                
+
     except Exception as error:
 
         has_module = hasattr(error, "__module__")
