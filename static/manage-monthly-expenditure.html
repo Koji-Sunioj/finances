@@ -84,6 +84,7 @@
           min="1"
           max="12"
           placeholder="3"
+          value="{{ start_month }}"
           required
         />
       </div>
@@ -97,12 +98,13 @@
           min="2026"
           min="2030"
           placeholder="2026"
+          value="{{ start_year }}"
           required
         />
       </div>
       <div class="form-group">
         <label for="cycles">how many months</label>
-        <input type="number" id="cycles" class="form-control" name="cycles" min="1" placeholder="10"/>
+        <input type="number" id="cycles" class="form-control" name="cycles" min="1" placeholder="10" value="{{ cycles }}"/>
       </div>
       <button type="submit" class="btn btn-primary">Submit</button>
     </form>

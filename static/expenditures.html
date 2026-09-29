@@ -43,16 +43,16 @@
       <tr>
         <td>{{ expenditure.modified }}</td>
         <td>
-          {% if expenditure.frequency == "daily" %}
+          {% if expenditure.frequency == "one-off" %}
+          <a href="/home/expenditures/one-off/{{ expenditure.expenditure_id }}">
+            {{ expenditure.name }}</a
+          >
+          {% elif expenditure.frequency == "daily" %}
           <a href="/home/expenditures/daily/{{ expenditure.expenditure_id }}">
             {{ expenditure.name }}</a
           >
           {% elif expenditure.frequency == "monthly" %}
           <a href="/home/expenditures/monthly/{{ expenditure.expenditure_id }}">
-            {{ expenditure.name }}</a
-          >
-          {% elif expenditure.frequency == "one-off" %}
-          <a href="/home/expenditures/one-off/{{ expenditure.expenditure_id }}">
             {{ expenditure.name }}</a
           >
           {% elif expenditure.frequency == "weekly" %}

@@ -82,8 +82,6 @@ async def get_expenditures(
     cursor.execute(select_expenditures, (request.state.user_id,))
     expenditures = cursor.fetchall()
 
-    pprint.pprint(expenditures)
-
     return templates.TemplateResponse(
         request=request,
         name="expenditures.html",
@@ -110,7 +108,7 @@ async def one_off_form(request: Request):
 async def get_one_off_item(request: Request, expenditure_id: int):
     select_one_off = "select expenditures.expenditure_id,occur_date::varchar,modified::varchar,name,type,\
         value from one_offs join expenditures on expenditures.expenditure_id = one_offs.expenditure_id \
-        where frequency = 'one-off' user_id = %s and expenditures.expenditure_id = %s;"
+        where frequency = 'one-off'and user_id = %s and expenditures.expenditure_id = %s;"
     cursor.execute(select_one_off, (request.state.user_id, expenditure_id))
     one_off = cursor.fetchone()
 
@@ -179,7 +177,7 @@ async def get_daily_expenditure(request: Request):
 @expenditures.get("/daily/{expenditure_id}", response_class=HTMLResponse)
 @tx
 async def daily_item(request: Request, expenditure_id: str):
-    select_daily = "select expenditures.expenditure_id,modified,name,type,value,start_date,end_date,skip from expenditures \
+    select_daily = "select expenditures.expenditure_id,modified,name,type,value,start_date,end_date from expenditures \
             join dailys on dailys.expenditure_id = expenditures.expenditure_id where frequency = 'daily' and user_id = %s \
             and expenditures.expenditure_id = %s;"
 
@@ -227,17 +225,15 @@ async def update_daily_item(request: Request, expenditure_id: str):
 
     result = update_expenditure(payload, request.state.user_id, expenditure_id)
 
-    update_daily = "update dailys set start_date = %s, end_date = %s, skip = %s from expenditures \
+    update_daily = "update dailys set start_date = %s, end_date = %s from expenditures \
             where expenditures.expenditure_id = dailys.expenditure_id \
             and expenditures.user_id = %s \
             and expenditures.expenditure_id = %s;"
 
-    skip = payload["skip"] if len(payload["skip"]) > 0 and int(
-        payload["skip"]) > 1 else None
     end_date = payload["end_date"] if len(payload["end_date"]) == 10 else None
 
     cursor.execute(update_daily, (payload["start_date"],
-                   end_date, skip, request.state.user_id, expenditure_id))
+                   end_date, request.state.user_id, expenditure_id))
 
     message = "expenditure %s: %s with type %s updated" % (
         expenditure_id,
@@ -265,7 +261,7 @@ async def get_weekly_expenditure(request: Request):
 @tx
 async def weekly_item(request: Request, expenditure_id: str):
     select_weekly = "select expenditures.expenditure_id,modified,name,type,value, \
-        start_date,end_date,json_agg(week_day) as days,skip from expenditures \
+        start_week,start_year,cycles,json_agg(week_day) as days from expenditures \
         join weeklys on weeklys.expenditure_id = expenditures.expenditure_id \
         join weekly_days on weekly_days.weekly_id = weeklys.weekly_id  \
         where expenditures.frequency = 'weekly' and user_id = %s and expenditures.expenditure_id = %s \
@@ -344,21 +340,33 @@ async def create_weekly_expenditure(request: Request):
 @tx
 async def update_weekly_item(request: Request, expenditure_id: str):
     payload = await request.form()
+    
+    week = int(payload["start_week"])
+    year = int(payload["start_year"])
+
+    begin_of_year = datetime.date(year, 1, 1)
+
+    week_one = begin_of_year - timedelta(days=begin_of_year.weekday())
+    target_week = week_one + timedelta(days=(week-1)*7)
+    invalid_params = [year < datetime.date.today().year, year > 2030]
+
+    if (target_week + timedelta(days=3)).year != year or any (invalid_params):
+        raise HTTPException(
+            status_code=400, detail="week %s with year %s is not a valid combination" % (week, year))
+
+    cycles = payload["cycles"] if len(payload["cycles"]) > 0 else None
 
     expenditure = update_expenditure(
         payload, request.state.user_id, expenditure_id)
 
-    end_date = payload["end_date"] if len(payload["end_date"]) > 0 else None
-    skip = payload["skip"] if len(payload["skip"]) > 0 and int(
-        payload["skip"]) >= 1 else None
 
-    update_weekly = "update weeklys set start_date = %s, end_date = %s, skip = %s from expenditures \
+    update_weekly = "update weeklys set start_week = %s, start_year = %s, cycles = %s from expenditures \
         where expenditures.expenditure_id = weeklys.expenditure_id \
         and expenditures.user_id = %s \
         and expenditures.expenditure_id = %s returning weekly_id;"
 
-    cursor.execute(update_weekly, (payload["start_date"],
-                   end_date, skip, request.state.user_id, expenditure_id))
+    cursor.execute(update_weekly, (week,
+                   year, cycles, request.state.user_id, expenditure_id))
     weekly_id = cursor.fetchone()["weekly_id"]
 
     delete_weekdays = "delete from weekly_days where weekly_id = %s;"
@@ -399,7 +407,7 @@ async def get_monthly_expenditure(request: Request):
 @tx
 async def monthly_item(request: Request, expenditure_id: str):
     select_monthly = "select expenditures.expenditure_id,modified,name,type,value,\
-        frequency,start_date,end_date,skip,json_agg(month_day) as days from expenditures \
+        frequency,start_month,start_year,cycles,json_agg(month_day) as days from expenditures \
         join monthlys on monthlys.expenditure_id = expenditures.expenditure_id \
         join monthly_days on monthly_days.monthly_id = monthlys.monthly_id \
         where expenditures.frequency = 'monthly' and user_id = %s and expenditures.expenditure_id = %s \
@@ -473,20 +481,26 @@ async def created_monthly_expenditure(request: Request):
 async def update_monthly_item(request: Request, expenditure_id: str):
     payload = await request.form()
 
+    month = int(payload["start_month"])
+    year =  int(payload["start_year"])
+
+    invalid_params = [month < 1, month > 12, year < datetime.date.today().year, year > 2030]
+
+    if any(invalid_params):
+        raise HTTPException(status_code=400,detail="week %s with year %s is not a valid combination" % (month, year))
+    
+    cycles = payload["cycles"] if len(payload["cycles"]) > 0 else None
+
     expenditure = update_expenditure(
         payload, request.state.user_id, expenditure_id)
 
-    end_date = payload["end_date"] if len(payload["end_date"]) > 0 else None
-    skip = payload["skip"] if len(payload["skip"]) > 0 and int(
-        payload["skip"]) >= 1 else None
-
-    update_weekly = "update monthlys set start_date = %s, end_date = %s, skip = %s from expenditures \
+    update_weekly = "update monthlys set start_month = %s, start_year = %s, cycles = %s from expenditures \
         where expenditures.expenditure_id = monthlys.expenditure_id \
         and expenditures.user_id = %s \
         and expenditures.expenditure_id = %s returning monthly_id;"
 
-    cursor.execute(update_weekly, (payload["start_date"],
-                   end_date, skip, request.state.user_id, expenditure_id))
+    cursor.execute(update_weekly, (month,
+                   year, cycles, request.state.user_id, expenditure_id))
     monthly_id = cursor.fetchone()["monthly_id"]
 
     delete_monthdays = "delete from monthly_days where monthly_id = %s;"
