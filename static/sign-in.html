@@ -36,6 +36,10 @@
     <div class="alert alert-danger mt-2" role="alert">
       invalid credentials for username {{ username }} 🙅
     </div>
+    {% elif error_code == 403 %}
+    <div class="alert alert-danger mt-2" role="alert">
+      credentials expired 
+    </div>
     {% endif %}
   </div>
 </div>

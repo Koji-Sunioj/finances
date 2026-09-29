@@ -22,12 +22,19 @@ pwd_context = CryptContext(schemes="sha256_crypt")
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
-    print(exc)
-    return templates.TemplateResponse(
-        request=request,
-        name="error.html",
-        context={"status_code": exc.status_code, "error_string": exc.detail},
-    )
+    if exc.status_code == 403:
+        return templates.TemplateResponse(
+                request=request,
+                name="sign-in.html",
+                context={"error_code": 403},
+                status_code=403,
+            )
+    else:
+        return templates.TemplateResponse(
+            request=request,
+            name="error.html",
+            context={"status_code": exc.status_code, "error_string": exc.detail},
+        )
 
 
 @root.get("/", response_class=HTMLResponse)

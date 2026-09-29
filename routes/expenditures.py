@@ -3,15 +3,19 @@ from fastapi import Request, Depends, APIRouter, HTTPException
 
 from templates import templates
 from utils.functions import (
-    decode_token, 
-    insert_expenditure, 
-    tx, 
-    cursor, 
-    update_expenditure, 
-    delete_expenditure, 
-    week_days, 
+    decode_token,
+    insert_expenditure,
+    tx,
+    cursor,
+    update_expenditure,
+    delete_expenditure,
+    week_days,
     month_days
 )
+
+import pprint
+import datetime
+from datetime import timedelta
 
 expenditures = APIRouter(
     prefix="/home/expenditures", dependencies=[Depends(decode_token)]
@@ -48,31 +52,37 @@ async def get_expenditures(
     direction_pointers = {"ascending": "asc", "descending": "desc"}
     sort_by = "order by %s %s" % (sort, direction_pointers[direction])
 
-    select_expenditures = f"select * from (select expenditures.expenditure_id, \
-        substring(modified::varchar,0,11) as modified, \
-        name, type, value, frequency, \
-        coalesce(one_offs.occur_date, weeklys.start_date,monthlys.start_date,dailys.start_date) starting, \
-        coalesce(weeklys.end_date,monthlys.end_date,dailys.end_date) ending, \
-        coalesce(weeklys.skip,monthlys.skip,dailys.skip) interval, \
+    select_expenditures = f"select expenditures.expenditure_id,expenditures.name, \
+        expenditures.type, expenditures.value, expenditures.frequency, substring(modified::varchar,0,11) as modified, \
+        coalesce(  \
+            one_offs.occur_date,  \
+            dailys.start_date,  \
+            to_date(weeklys.start_year::varchar ||'-'|| start_week::varchar,'IYYY-IW'),  \
+            make_date(monthlys.start_year,start_month,1)  \
+        ) starting,  \
+        coalesce(  \
+            dailys.end_date,  \
+            (to_date(weeklys.start_year::varchar ||'-'|| weeklys.start_week::varchar,'IYYY-IW') + (''||weeklys.cycles||' weeks')::interval)::date,  \
+            (to_date(monthlys.start_year||'-'||monthlys.start_month,'YYYY-MM' ) + (''||monthlys.cycles||' months')::interval)::date  \
+        ) ending,  \
         case \
             when count(weekly_days.week_day) > 0 then count(weekly_days.week_day) \
             when count(monthly_days.month_day) > 0 then count(monthly_days.month_day) \
         end dates \
-    from expenditures \
-        left join one_offs on one_offs.expenditure_id = expenditures.expenditure_id \
-        left join monthlys on monthlys.expenditure_id = expenditures.expenditure_id \
-        left join monthly_days on monthly_days.monthly_id = monthlys.monthly_id \
-        left join weeklys on weeklys.expenditure_id = expenditures.expenditure_id \
-        left join weekly_days on weekly_days.weekly_id = weeklys.weekly_id \
-        left join dailys on dailys.expenditure_id = expenditures.expenditure_id \
-    where user_id = %s \
-    group by expenditures.expenditure_id, starting, ending, interval {sort_by}) expenditure_values where \
-    (expenditure_values.frequency = 'one-off' and expenditure_values.starting >= current_date) or \
-    (expenditure_values.frequency != 'one-off' and expenditure_values.ending >= current_date) or \
-    (expenditure_values.frequency != 'one-off' and expenditure_values.starting >= current_date and expenditure_values.ending is null);"
+        from expenditures  \
+    left join one_offs on one_offs.expenditure_id = expenditures.expenditure_id  \
+    left join dailys on dailys.expenditure_id = expenditures.expenditure_id  \
+    left join weeklys on weeklys.expenditure_id = expenditures.expenditure_id \
+    left join weekly_days on weekly_days.weekly_id = weeklys.weekly_id \
+    left join monthlys on monthlys.expenditure_id = expenditures.expenditure_id \
+    left join monthly_days on monthly_days.monthly_id = monthlys.monthly_id \
+    where expenditures.user_id = %s \
+    group by expenditures.expenditure_id,one_offs.one_off_id,dailys.daily_id,weeklys.weekly_id,monthlys.monthly_id {sort_by};"
 
     cursor.execute(select_expenditures, (request.state.user_id,))
     expenditures = cursor.fetchall()
+
+    pprint.pprint(expenditures)
 
     return templates.TemplateResponse(
         request=request,
@@ -192,12 +202,10 @@ async def create_daily_expenditure(request: Request):
         payload, request.state.user_id, "daily")
 
     end_date = payload["end_date"] if len(payload["end_date"]) > 0 else None
-    skip = payload["skip"] if len(payload["skip"]) > 0 and int(
-        payload["skip"]) > 1 else None
 
-    insert_daily = "insert into dailys (expenditure_id,start_date,end_date,skip) values (%s,%s,%s,%s);"
+    insert_daily = "insert into dailys (expenditure_id,start_date,end_date) values (%s,%s,%s);"
     execute_args = (expenditure["expenditure_id"],
-                    payload["start_date"], end_date, skip)
+                    payload["start_date"], end_date)
     cursor.execute(insert_daily, execute_args)
 
     message = "expenditure %s: %s with type %s created" % (
@@ -287,16 +295,28 @@ async def weekly_item(request: Request, expenditure_id: str):
 async def create_weekly_expenditure(request: Request):
     payload = await request.form()
 
+    week = int(payload["start_week"])
+    year = int(payload["start_year"])
+
+    begin_of_year = datetime.date(year, 1, 1)
+
+    week_one = begin_of_year - timedelta(days=begin_of_year.weekday())
+    target_week = week_one + timedelta(days=(week-1)*7)
+    invalid_params = [year < datetime.date.today().year, year > 2030]
+
+    if (target_week + timedelta(days=3)).year != year or any (invalid_params):
+        raise HTTPException(
+            status_code=400, detail="week %s with year %s is not a valid combination" % (week, year))
+
+    cycles = payload["cycles"] if len(payload["cycles"]) > 0 else None
+
     expenditure = insert_expenditure(
         payload, request.state.user_id, "weekly")
 
-    end_date = payload["end_date"] if len(payload["end_date"]) > 0 else None
-    skip = payload["skip"] if len(payload["skip"]) > 0 and int(
-        payload["skip"]) >= 1 else None
-
-    insert_weekly = "insert into weeklys (expenditure_id,start_date,end_date,skip) values (%s,%s,%s,%s) returning weekly_id;"
+    insert_weekly = "insert into weeklys (expenditure_id,start_week,start_year,cycles) \
+        values (%s,%s,%s,%s) returning weekly_id;"
     execute_args = (expenditure["expenditure_id"],
-                    payload["start_date"], end_date, skip)
+                    payload["start_week"], payload["start_year"], cycles)
     cursor.execute(insert_weekly, execute_args)
 
     weekly_id = cursor.fetchone()["weekly_id"]
@@ -409,16 +429,22 @@ async def monthly_item(request: Request, expenditure_id: str):
 async def created_monthly_expenditure(request: Request):
     payload = await request.form()
 
+    month = int(payload["start_month"])
+    year =  int(payload["start_year"])
+
+    invalid_params = [month < 1, month > 12, year < datetime.date.today().year, year > 2030]
+
+    if any(invalid_params):
+        raise HTTPException(status_code=400,detail="week %s with year %s is not a valid combination" % (month, year))
+    
+    cycles = payload["cycles"] if len(payload["cycles"]) > 0 else None
+
     expenditure = insert_expenditure(
         payload, request.state.user_id, "monthly")
 
-    end_date = payload["end_date"] if len(payload["end_date"]) > 0 else None
-    skip = payload["skip"] if len(payload["skip"]) > 0 and int(
-        payload["skip"]) > 1 else None
-
-    insert_monthly = "insert into monthlys (expenditure_id,start_date,end_date,skip) values (%s,%s,%s,%s) returning monthly_id;"
+    insert_monthly = "insert into monthlys (expenditure_id,start_month,start_year,cycles) values (%s,%s,%s,%s) returning monthly_id;"
     execute_args = (expenditure["expenditure_id"],
-                    payload["start_date"], end_date, skip)
+                    month, year,cycles)
     cursor.execute(insert_monthly, execute_args)
 
     monthly_id = cursor.fetchone()["monthly_id"]

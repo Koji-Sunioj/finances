@@ -73,32 +73,36 @@
         </select>
       </div>
       <div class="form-group">
-        <label for="skip">skips every n weeks:</label>
-        <input type="number" id="skip" class="form-control" name="skip" value="{{ skip }}" min="1" />
-      </div>
-      <div class="form-group">
-        <label for="start_date">start date</label>
+        <label for="start_week">starting week</label>
         <input
-          type="date"
-          id="start_date"
+          type="text"
+          id="start_week"
           class="form-control"
-          name="start_date"
-          value="{{ start_date }}"
-          min="{{ request.state.max_date }}"
+          name="start_week"
+          min="51"
+          max="53"
+          placeholder="52"
           required
         />
       </div>
       <div class="form-group">
-        <label for="end_date">end date (leave empty for no end)</label>
+        <label for="start_year">starting year</label>
         <input
-          type="date"
-          id="end_date"
+          type="text"
+          id="start_year"
           class="form-control"
-          name="end_date"
-          value="{{ end_date }}"
-          min="{{ request.state.max_date }}"
+          name="start_year"
+          min="2026"
+          min="2030"
+          placeholder="2026"
+          required
         />
       </div>
+      <div class="form-group">
+        <label for="cycles">how many weeks</label>
+        <input type="number" id="cycles" class="form-control" name="cycles" min="1" placeholder="10"/>
+      </div>
+      <p><i>please input the week number and year that this expenditure starts. week and year combinations are checked in the server.</i></p>
       <button type="submit" class="btn btn-primary">Submit</button>
     </form>
     {% if expenditure_id %}
