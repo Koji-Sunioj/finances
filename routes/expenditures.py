@@ -13,7 +13,6 @@ from utils.functions import (
     month_days
 )
 
-import pprint
 import datetime
 from datetime import timedelta
 
@@ -300,7 +299,7 @@ async def create_weekly_expenditure(request: Request):
     target_week = week_one + timedelta(days=(week-1)*7)
     invalid_params = [year < datetime.date.today().year, year > 2030]
 
-    if (target_week + timedelta(days=3)).year != year or any (invalid_params):
+    if (target_week + timedelta(days=3)).year != year or any(invalid_params):
         raise HTTPException(
             status_code=400, detail="week %s with year %s is not a valid combination" % (week, year))
 
@@ -340,7 +339,7 @@ async def create_weekly_expenditure(request: Request):
 @tx
 async def update_weekly_item(request: Request, expenditure_id: str):
     payload = await request.form()
-    
+
     week = int(payload["start_week"])
     year = int(payload["start_year"])
 
@@ -350,7 +349,7 @@ async def update_weekly_item(request: Request, expenditure_id: str):
     target_week = week_one + timedelta(days=(week-1)*7)
     invalid_params = [year < datetime.date.today().year, year > 2030]
 
-    if (target_week + timedelta(days=3)).year != year or any (invalid_params):
+    if (target_week + timedelta(days=3)).year != year or any(invalid_params):
         raise HTTPException(
             status_code=400, detail="week %s with year %s is not a valid combination" % (week, year))
 
@@ -358,7 +357,6 @@ async def update_weekly_item(request: Request, expenditure_id: str):
 
     expenditure = update_expenditure(
         payload, request.state.user_id, expenditure_id)
-
 
     update_weekly = "update weeklys set start_week = %s, start_year = %s, cycles = %s from expenditures \
         where expenditures.expenditure_id = weeklys.expenditure_id \
@@ -438,13 +436,15 @@ async def created_monthly_expenditure(request: Request):
     payload = await request.form()
 
     month = int(payload["start_month"])
-    year =  int(payload["start_year"])
+    year = int(payload["start_year"])
 
-    invalid_params = [month < 1, month > 12, year < datetime.date.today().year, year > 2030]
+    invalid_params = [month < 1, month > 12, year <
+                      datetime.date.today().year, year > 2030]
 
     if any(invalid_params):
-        raise HTTPException(status_code=400,detail="week %s with year %s is not a valid combination" % (month, year))
-    
+        raise HTTPException(
+            status_code=400, detail="week %s with year %s is not a valid combination" % (month, year))
+
     cycles = payload["cycles"] if len(payload["cycles"]) > 0 else None
 
     expenditure = insert_expenditure(
@@ -452,7 +452,7 @@ async def created_monthly_expenditure(request: Request):
 
     insert_monthly = "insert into monthlys (expenditure_id,start_month,start_year,cycles) values (%s,%s,%s,%s) returning monthly_id;"
     execute_args = (expenditure["expenditure_id"],
-                    month, year,cycles)
+                    month, year, cycles)
     cursor.execute(insert_monthly, execute_args)
 
     monthly_id = cursor.fetchone()["monthly_id"]
@@ -482,13 +482,15 @@ async def update_monthly_item(request: Request, expenditure_id: str):
     payload = await request.form()
 
     month = int(payload["start_month"])
-    year =  int(payload["start_year"])
+    year = int(payload["start_year"])
 
-    invalid_params = [month < 1, month > 12, year < datetime.date.today().year, year > 2030]
+    invalid_params = [month < 1, month > 12, year <
+                      datetime.date.today().year, year > 2030]
 
     if any(invalid_params):
-        raise HTTPException(status_code=400,detail="week %s with year %s is not a valid combination" % (month, year))
-    
+        raise HTTPException(
+            status_code=400, detail="week %s with year %s is not a valid combination" % (month, year))
+
     cycles = payload["cycles"] if len(payload["cycles"]) > 0 else None
 
     expenditure = update_expenditure(

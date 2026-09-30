@@ -137,7 +137,7 @@ def decode_token(request: Request):
         request.state.user_id = jwt_payload["user_id"]
 
         has_form = re.search(
-            r"\/home\/expenditures\/(?=weekly|daily|one\-off|monthly)", uri)
+            r"\/home\/expenditures\/(?=daily|one\-off)|forecast", uri)
 
         if has_form:
             request.state.max_date = date.today().isoformat()
@@ -167,3 +167,16 @@ def create_token(username, user_id):
     token_string = "token=%s; Path=/; SameSite=Lax" % token
 
     return token_string
+
+def week_to_date(week, year):
+    begin_of_year = date(year, 1, 1)
+    week_one = begin_of_year - timedelta(days=begin_of_year.weekday())
+
+    if (week_one + timedelta(days=3)).year != year:
+        week_one = week_one + timedelta(days=7)
+
+    return week_one + timedelta(days=(week-1)*7)
+
+def month_from_cycle(month, n_months):
+    month = month + timedelta(days=31*(n_months-1))
+    return month - timedelta(days=month.day-1)

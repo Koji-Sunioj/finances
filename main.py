@@ -3,6 +3,7 @@ from starlette.exceptions import HTTPException
 from fastapi import FastAPI, Request, APIRouter, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from routes.expenditures import expenditures
+from routes.forecast import forecast
 
 from templates import templates
 from utils.functions import tx, breadcrumbs, create_token, decode_token, cursor
@@ -13,6 +14,7 @@ app = FastAPI()
 root = APIRouter()
 
 root.include_router(expenditures)
+root.include_router(forecast)
 app.include_router(root)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")

@@ -1,0 +1,84 @@
+{% extends 'base.html' %} {% block content %}
+<h1>Forecast</h1>
+<p>
+  <i
+    >input start and end date with the starting balance. the server will return
+    calculated expenditures when submitted.</i
+  >
+</p>
+{% if message %}
+<div class="row">
+  <div class="col">
+    <div class="alert alert-success" role="alert">
+      <p>{{ message }}</p>
+    </div>
+  </div>
+</div>
+{% endif %}
+<form method="GET" action="/home/forecast">
+  <div class="row">
+    <div class="col">
+      <label for="start_date">start date</label>
+      <input
+        type="date"
+        id="start_date"
+        class="form-control"
+        name="start_date"
+        value="{{ start_date }}"
+        min="{{ request.state.max_date }}"
+        required
+      />
+    </div>
+    <div class="col">
+      <label for="end_date">end date</label>
+      <input
+        type="date"
+        id="end_date"
+        class="form-control"
+        name="end_date"
+        value="{{ end_date }}"
+        min="{{ request.state.max_date }}"
+        required
+      />
+    </div>
+    <div class="col">
+      <label for="balance">balance:</label>
+      <input
+        type="number"
+        id="balance"
+        class="form-control"
+        name="balance"
+        placeholder="5000"
+        value="{{ balance }}"
+        required
+      />
+    </div>
+  </div>
+</form>
+{% if bill_days %}
+{% set headers =['date','name','value','balance','type'] %} 
+<div class="row">
+    <table class="table">
+        <thead>
+            {% for header in headers %}
+                <th scope="col">{{ header }}</th>
+            {% endfor %}
+        </thead>
+        <tbody>
+        {% for bill_day in bill_days %}
+            <tr>
+                <td>{{ bill_day.date }}</td>
+                <td>{{ bill_day.name }}</td>
+                <td>{{ bill_day.value }}</td>
+                <td>{{ bill_day.after_expenditure | round(2) }}</td>
+                <td>{{ bill_day.type }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+<p><b>ending balance: {{ ending_balance | round(2) }}</b></p>
+<p><b>deposits: {{ deposits | round(2) }}</b></p>
+<p><b>expense: {{ expenses | round(2) }}</b></p>
+{% endif %}
+{% endblock %}
