@@ -40,7 +40,7 @@ async def get_expenditures(
         "type",
         "value",
         "interval",
-        "dates",
+        "days",
     ]
     invalid_direction = direction not in ["ascending", "descending"]
 
@@ -67,7 +67,7 @@ async def get_expenditures(
         case \
             when count(weekly_days.week_day) > 0 then count(weekly_days.week_day) \
             when count(monthly_days.month_day) > 0 then count(monthly_days.month_day) \
-        end dates \
+        end days \
         from expenditures  \
     left join one_offs on one_offs.expenditure_id = expenditures.expenditure_id  \
     left join dailys on dailys.expenditure_id = expenditures.expenditure_id  \

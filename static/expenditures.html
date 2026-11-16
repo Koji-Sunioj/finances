@@ -12,7 +12,7 @@
 {% if expenditures %} 
 {% set navigation = {'ascending':'descending','descending':'ascending'} %} 
 {% set nextquery = "/home/expenditures/?sort=%s&direction=" % (sort,) + navigation[direction] %}
-{% set headers =['modified','name','frequency','starting','ending','type','value','dates'] %} 
+{% set headers =['modified','name','frequency','starting','ending','type','value','days'] %} 
 {% set direction_icon = {'ascending':'\U0001F446','descending':'\U0001F447'} %}
 <div class="row">
   <table class="table">
@@ -35,7 +35,8 @@
               >{{header}}</a
             >
           </th>
-        {% endif %} {% endfor %}
+        {% endif %} 
+        {% endfor %}
       </tr>
     </thead>
     <tbody>
@@ -43,44 +44,22 @@
       <tr>
         <td>{{ expenditure.modified }}</td>
         <td>
-          {% if expenditure.frequency == "one-off" %}
-          <a href="/home/expenditures/one-off/{{ expenditure.expenditure_id }}">
+          <a href="/home/expenditures/{{ expenditure.frequency }}/{{ expenditure.expenditure_id }}">
             {{ expenditure.name }}</a
           >
-          {% elif expenditure.frequency == "daily" %}
-          <a href="/home/expenditures/daily/{{ expenditure.expenditure_id }}">
-            {{ expenditure.name }}</a
-          >
-          {% elif expenditure.frequency == "monthly" %}
-          <a href="/home/expenditures/monthly/{{ expenditure.expenditure_id }}">
-            {{ expenditure.name }}</a
-          >
-          {% elif expenditure.frequency == "weekly" %}
-          <a href="/home/expenditures/weekly/{{ expenditure.expenditure_id }}">
-            {{ expenditure.name }}</a
-          >
-          {% endif %}
         </td>
         <td>{{ expenditure.frequency }}</td>
         <td>{{ expenditure.starting }}</td>
         <td>
-          {% if expenditure.frequency in ['daily','monthly','weekly'] and expenditure.ending == None %}
-            ♾️
-          {% elif expenditure.frequency == 'one-off' %}
-            ❌
-          {% else %}
-            {{ expenditure.ending }} 
+          {% if expenditure.ending %}
+            {{ expenditure.ending }}
           {% endif %}
         </td>
         <td>{{ expenditure.type }}</td>
         <td>{{ expenditure.value }}</td>
         <td>
-          {% if expenditure.frequency in ['daily','monthly','weekly'] and expenditure.dates == None %}
-            ♾️
-          {% elif expenditure.frequency == 'one-off' %}
-            ❌
-          {% else %}
-            {{ expenditure.dates }}
+          {% if expenditure.days %}
+            {{ expenditure.days }}
           {% endif %}
         </td>
       </tr>
