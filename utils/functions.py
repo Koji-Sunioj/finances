@@ -1,7 +1,10 @@
 import re
 import os
+import io
+import base64
 import psycopg2
 import psycopg2.extras
+import matplotlib.pyplot as plt
 
 from jose import jwt
 from functools import wraps
@@ -122,12 +125,138 @@ def breadcrumbs(url):
     return breadcrumbs
 
 
+def bar_chart_image(bill_days):
+    expenditure_names = list({bill["name"] for bill in bill_days})
+    expenditures = [{"name": expenditure, "value": 0}
+                    for expenditure in expenditure_names.copy()]
+
+    for expenditure in expenditures:
+        for bill in bill_days:
+            if bill["name"] == expenditure["name"]:
+                expenditure["value"] += bill["value"]
+
+    expenditures.sort(key=lambda expenditure: expenditure['value'])
+
+    ax = plt.subplots()[1]
+    bar_container = ax.bar([expenditure["name"] for expenditure in expenditures], [expenditure["value"]
+                           for expenditure in expenditures], color=["g" if expenditure["value"] > 0 else "r" for expenditure in expenditures])
+    ax.bar_label(bar_container)
+    ax.axhline(y=0, linewidth=1, color='k')
+
+    plt.title("Expenditures grouped by name")
+    plt.xlabel("name")
+    plt.ylabel("amount")
+    plt.tight_layout()
+
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png')
+    plt.close()
+
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+
+def log_chart_image(expenditures, start_date, end_date):
+    expediture_names = list({expenditure["name"] for expenditure in expenditures})
+    date_diff = end_date - start_date
+    dates = [(start_date + timedelta(days=n)).date() for n in range(date_diff.days +1)]
+
+    logarhythms = []
+
+    for expenditure_name in expediture_names:
+        values = []
+        selected = [expenditure for expenditure in expenditures if expenditure["name"] == expenditure_name]
+        for date in dates:
+            found = None
+            for select in selected:
+                if select["date"] == date:
+                    found = select
+                    break
+            if found:
+                values.append(found["value"])
+            else:
+                values.append(0)
+
+        log = []
+        for n,value in enumerate(values):
+            if n > 0:
+                log.append(log[n - 1] + value)
+            else:
+                log.append(value)
+        
+        logarhythms.append({"name":expenditure_name,"log":log})
+
+    logarhythms.sort(key=lambda log: sum(log['log']), reverse=True)
+
+    fig, axes = plt.subplots(nrows=len(logarhythms),figsize=(10,len(logarhythms) * 2), constrained_layout=True)
+    fig.suptitle("logarithm(s) for expenditures", fontsize=16)
+
+    for ax,expenditure in zip(axes,logarhythms):
+        ax.set_title(expenditure["name"])
+        color = "red" if expenditure["log"][-1] < 0 else "#1f77b4"
+        ax.plot(dates,[l for l in expenditure["log"]],label="asd",color=color)
+
+    plt.xlabel("date")
+    plt.ylabel("amount")
+    plt.tight_layout()
+
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png')
+    plt.close()
+
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+def pie_chart_image(expenditures, title):
+    ax = plt.subplots()[1]
+    ax.pie([abs(expenditure["value"]) for expenditure in expenditures],
+           autopct='%1.1f%%', labels=[expenditure["name"] for expenditure in expenditures])
+    plt.title("{} %".format(title))
+    plt.tight_layout()
+
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png')
+    plt.close()
+
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+
+def pie_chart_groupings(bill_days, expenditure_names):
+    expenditures = [{"name": expense, "value": 0}
+                    for expense in expenditure_names.copy()]
+
+    for expenditure in expenditures:
+        for bill in bill_days:
+            if bill["name"] == expenditure["name"]:
+                expenditure["value"] += bill["value"]
+
+    total_expenditures = sum([abs(expenditure["value"])
+                             for expenditure in expenditures])
+
+    small_values = []
+
+    for expenditure in expenditures:
+        if abs(expenditure["value"]) * 100 / total_expenditures < 10:
+            small_values.append(expenditure)
+
+    expenditures = [expenditure for expenditure in expenditures.copy() if abs(
+        expenditure["value"]) * 100 / total_expenditures > 10]
+
+    small_value, small_name = None, None
+
+    if len(small_values) > 1:
+        small_name = ",\n".join([something["name"]
+                                for something in small_values])
+        small_value = sum([something["value"] for something in small_values])
+    elif len(small_values) == 1:
+        small_name, small_value = small_values[0]["name"], small_values[0]["value"]
+
+    if small_name and small_value:
+        expenditures.append({"name": small_name, "value": small_value})
+
+    return expenditures
+
+
 def decode_token(request: Request):
     try:
-        uri_pattern = re.search(
-            r"(?<=http:\/\/localhost:8000).+", str(request.url))
-        uri = uri_pattern.group(0)
-
         token_pattern = re.search(
             r"token=(.+?)(?=;|$)", request.headers["cookie"])
         jwt_payload = jwt.decode(token_pattern.group(1), key=fe_key)
@@ -136,20 +265,17 @@ def decode_token(request: Request):
         request.state.breadcrumbs = breadcrumbs(str(request.url))
         request.state.user_id = jwt_payload["user_id"]
 
+        uri_pattern = re.search(
+            r"(?<=http:\/\/localhost:8000).+", str(request.url))
+        uri = uri_pattern.group(0)
         has_form = re.search(
             r"\/home\/expenditures\/(?=daily|one\-off)|forecast", uri)
 
         if has_form:
             request.state.max_date = date.today().isoformat()
 
-    except Exception as error:
-
-        has_module = hasattr(error, "__module__")
-
-        if has_module and error.__module__ == "jose.exceptions":
-            raise HTTPException(status_code=403)
-        else:
-            raise HTTPException(status_code=400)
+    except:
+        raise HTTPException(status_code=403)
 
 
 def create_token(username, user_id):
@@ -168,6 +294,7 @@ def create_token(username, user_id):
 
     return token_string
 
+
 def week_to_date(week, year):
     begin_of_year = date(year, 1, 1)
     week_one = begin_of_year - timedelta(days=begin_of_year.weekday())
@@ -176,6 +303,7 @@ def week_to_date(week, year):
         week_one = week_one + timedelta(days=7)
 
     return week_one + timedelta(days=(week-1)*7)
+
 
 def month_from_cycle(month, n_months):
     month = month + timedelta(days=31*(n_months-1))

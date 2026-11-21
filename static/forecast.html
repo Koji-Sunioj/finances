@@ -66,8 +66,20 @@
         <label class="form-check-label" for="bar_chart">Bar chart, grouped by expenditure name</label>
       </div>
       <div class="form-check">
-        <input type="checkbox" class="form-check-input" name="pie_chart" />
+        {% if expenses_pie_chart or deposits_pie_chart %}
+          <input type="checkbox" class="form-check-input" name="pie_chart" checked/>
+        {% else %}
+          <input type="checkbox" class="form-check-input" name="pie_chart" />
+        {% endif %}
         <label class="form-check-label" for="pie_chart">Pie chart(s) for deposits and expenses</label>
+      </div>
+      <div class="form-check">
+        {% if log_chart or log_chart %}
+          <input type="checkbox" class="form-check-input" name="log_chart" checked/>
+        {% else %}
+          <input type="checkbox" class="form-check-input" name="log_chart" />
+        {% endif %}
+        <label class="form-check-label" for="log_chart">Logarithm chart(s) for expenditures</label>
       </div>
     </div>
   </div>
@@ -108,22 +120,34 @@
 <p><b>ending balance: {{ ending_balance | round(2) }}</b></p>
 <p><b>deposits: {{ deposits | round(2) }}</b></p>
 <p><b>expenses: {{ expenses | round(2) }}</b></p>
+{% endif %}
 
 {% if bar_chart %}
 <hr/>
-<h2>Bar chart groupings</h2>
 <div class="row">
   <img src="data:image/png;base64,{{ bar_chart | safe }}">
 </div>
 {% endif %}
 
-{% if pie_chart %}
+{% if expenses_pie_chart %}
 <hr/>
-<h2>Pie chart(s)</h2>
 <div class="row">
-  <img src="data:image/png;base64,{{ pie_chart | safe }}">
+  <img src="data:image/png;base64,{{ expenses_pie_chart | safe }}" >
 </div>
 {% endif %}
 
+{% if deposits_pie_chart %}
+<hr/>
+<div class="row">
+  <img src="data:image/png;base64,{{ deposits_pie_chart | safe }}">
+</div>
 {% endif %}
+
+{% if log_chart %}
+<hr/>
+<div class="row">
+  <img src="data:image/png;base64,{{ log_chart | safe }}">
+</div>
+{% endif %}
+
 {% endblock %}

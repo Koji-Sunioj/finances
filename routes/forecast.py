@@ -5,17 +5,16 @@ from utils.functions import (
     tx,
     cursor,
     week_to_date,
-    month_from_cycle
+    month_from_cycle,
+    bar_chart_image,
+    pie_chart_image,
+    log_chart_image,
+    pie_chart_groupings
 )
 
-import io
-import base64
 import datetime
-import matplotlib.pyplot as plt
-
 from pprint import pprint
 from datetime import timedelta, date, datetime
-from functools import reduce
 
 forecast = APIRouter(
     prefix="/home/forecast", dependencies=[Depends(decode_token)]
@@ -26,7 +25,7 @@ forecast = APIRouter(
 
 @forecast.get("")
 @tx
-async def get_forecast(request: Request, start_date: str = None, end_date: str = None, balance: float = None, bar_chart: str = None, pie_chart: str = None):
+async def get_forecast(request: Request, start_date: str = None, end_date: str = None, balance: float = None, bar_chart: str = None, pie_chart: str = None, log_chart: str = None):
     if all([start_date, end_date, balance]):
         start_bill = datetime.strptime(start_date, "%Y-%m-%d").date()
         end_bill = datetime.strptime(end_date, "%Y-%m-%d").date()
@@ -107,7 +106,7 @@ async def get_forecast(request: Request, start_date: str = None, end_date: str =
             join expenditures on expenditures.expenditure_id = monthlys.expenditure_id \
             join monthly_days on monthly_days.monthly_id = monthlys.monthly_id where user_id = %s \
             group by expenditures.expenditure_id,monthlys.monthly_id;"
-        cursor.execute(select_monthlys,(request.state.user_id,))
+        cursor.execute(select_monthlys, (request.state.user_id,))
         monthlys = cursor.fetchall()
 
         end_month_view = end_bill - timedelta(end_bill.day-1)
@@ -156,96 +155,33 @@ async def get_forecast(request: Request, start_date: str = None, end_date: str =
                 expenses += bill_day["value"]
 
         context = {"start_date": start_date,
-                     "end_date": end_date, "balance": balance, "bill_days": bill_days,
-                     "ending_balance": ending_balance, "deposits": deposits, "expenses": expenses}
+                   "end_date": end_date, "balance": balance, "bill_days": bill_days,
+                   "ending_balance": ending_balance, "deposits": deposits, "expenses": expenses}
 
         if bar_chart == "on":
-            expense_names = []
-
-            for bill in bill_days:
-                if bill["name"] not in expense_names:
-                    expense_names.append(bill["name"])
-
-            expenses = [{"name":expense,"value": 0} for expense in expense_names.copy()]
-
-            for expense in expenses:
-                for bill in bill_days:
-                    if bill["name"] == expense["name"]:
-                        expense["value"] += bill["value"]
-
-            expenses.sort(key=lambda expense: expense['value'])
-
-            ax = plt.subplots()[1]
-            bar_container = ax.bar([expense["name"] for expense in expenses],[expense["value"] for expense in expenses],color=["g" if expense["value"] > 0 else "r" for expense in expenses]) 
-            ax.bar_label(bar_container)
-            ax.axhline(y=0,linewidth=1, color='k')
-
-            plt.title("period: %s through %s" % (start_date, end_date))
-            plt.xlabel("name")
-            plt.ylabel("amount")
-            plt.tight_layout()
-            
-            img_buf = io.BytesIO()
-            plt.savefig(img_buf, format='png')
-            plt.close()
-
-            base64_encoded_image = base64.b64encode(img_buf.getvalue()).decode("utf-8")
-            context["bar_chart"] = base64_encoded_image
+            context["bar_chart"] = bar_chart_image(bill_days)
 
         if pie_chart == "on":
-            expense_names = []
-            deposit_names = []
+            expense_names = list({bill["name"]
+                                 for bill in bill_days if bill["value"] < 0})
+            deposit_names = list({bill["name"]
+                                 for bill in bill_days if bill["value"] > 0})
 
-            for bill in bill_days:
-                if bill["value"] > 0 and bill["name"] not in deposit_names:
-                    deposit_names.append(bill["name"])
-                elif bill["value"] < 0 and bill["name"] not in expense_names:
-                    expense_names.append(bill["name"])
-            
-            expenses = [{"name":expense,"value": 0} for expense in expense_names.copy()]
-            deposits = [{"name":deposit,"value": 0} for deposit in deposit_names.copy()]
+            pie_chart_expenses = pie_chart_groupings(bill_days, expense_names)
+            pie_chart_deposits = pie_chart_groupings(bill_days, deposit_names)
 
-            for expense in expenses:
-                for bill in bill_days:
-                    if bill["name"] == expense["name"]:
-                        expense["value"] += bill["value"]
+            if len(pie_chart_expenses) > 0:
+                context["expenses_pie_chart"] = pie_chart_image(
+                    pie_chart_expenses, "expenses")
 
-            for deposit in deposits:
-                for bill in bill_days:
-                    if bill["name"] == deposit["name"]:
-                        deposit["value"] += bill["value"]
+            if len(pie_chart_deposits) > 0:
+                context["deposits_pie_chart"] = pie_chart_image(
+                    pie_chart_deposits, "deposits")
 
-            total_expenses = sum([abs(expense["value"]) for expense in expenses])
-
-            small_values = []
-
-            for expense in expenses:
-                if abs(expense["value"]) * 100 / total_expenses < 10:
-                    small_values.append(expense)
-
-            expenses = [expense for expense in expenses.copy() if abs(expense["value"]) * 100 / total_expenses > 10]
-
-            small_name,small_name = None, None
-
-            if len(small_values) > 1:
-                small_name = reduce(lambda result, current: result["name"] +",\n"+ current["name"], small_values)
-                small_value = reduce(lambda result, current: result["value"] + current["value"], small_values)
-            else:
-                small_name, small_value = small_values[0]["name"], small_values[0]["value"]
-            
-            expenses.append({"name":small_name,"value":small_value})
-
-            ax = plt.subplots()[1]
-            ax.pie([abs(expense["value"]) for expense in expenses],autopct='%1.1f%%',labels=[expense["name"] for expense in expenses])
-            plt.title("expense share")
-            plt.tight_layout()
-            
-            img_buf = io.BytesIO()
-            plt.savefig(img_buf, format='png')
-            plt.close()
-
-            base64_encoded_image = base64.b64encode(img_buf.getvalue()).decode("utf-8")
-            context["pie_chart"] = base64_encoded_image
+        if log_chart == "on":
+            format = "%Y-%m-%d"
+            context["log_chart"] = log_chart_image(bill_days, datetime.strptime(
+                start_date, format), datetime.strptime(end_date, format))
 
         return templates.TemplateResponse(
             request=request,
