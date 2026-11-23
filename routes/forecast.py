@@ -4,6 +4,7 @@ from utils.functions import (
     decode_token,
     tx,
     cursor,
+    date_list,
     week_to_date,
     month_from_cycle,
     bar_chart_image,
@@ -25,7 +26,8 @@ forecast = APIRouter(
 
 @forecast.get("")
 @tx
-async def get_forecast(request: Request, start_date: str = None, end_date: str = None, balance: float = None, bar_chart: str = None, pie_chart: str = None, log_chart: str = None):
+async def get_forecast(request: Request, start_date: str = None, end_date: str = None, balance: float = None,
+                       bar_chart: str = None, pie_chart: str = None, log_chart: str = None, view_type: str = None):
     if all([start_date, end_date, balance]):
         start_bill = datetime.strptime(start_date, "%Y-%m-%d").date()
         end_bill = datetime.strptime(end_date, "%Y-%m-%d").date()
@@ -154,9 +156,8 @@ async def get_forecast(request: Request, start_date: str = None, end_date: str =
             elif bill_day["value"] < 0:
                 expenses += bill_day["value"]
 
-        context = {"start_date": start_date,
-                   "end_date": end_date, "balance": balance, "bill_days": bill_days,
-                   "ending_balance": ending_balance, "deposits": deposits, "expenses": expenses}
+        context = {"start_date": start_date, "end_date": end_date, "balance": balance,
+                   "ending_balance": ending_balance, "deposits": deposits, "expenses": expenses, "view_type": view_type}
 
         if bar_chart == "on":
             context["bar_chart"] = bar_chart_image(bill_days)
@@ -179,9 +180,59 @@ async def get_forecast(request: Request, start_date: str = None, end_date: str =
                     pie_chart_deposits, "deposits")
 
         if log_chart == "on":
-            format = "%Y-%m-%d"
-            context["log_chart"] = log_chart_image(bill_days, datetime.strptime(
-                start_date, format), datetime.strptime(end_date, format))
+            dates = date_list(start_bill, end_bill)
+            context["log_chart"] = log_chart_image(bill_days, dates)
+
+        match view_type:
+            case "list":
+                context["bill_days"] = bill_days
+
+            case "month":
+                dates = dates = date_list(start_bill, end_bill)
+                year_months = list(
+                    {str(date.year)+"-"+str(date.month) for date in dates})
+                bill_months = []
+
+                for year_month in year_months:
+                    for bill_day in bill_days:
+                        if str(bill_day["date"].year)+"-"+str(bill_day["date"].month) == year_month:
+                            append_to_list = True
+                            for bill_month in bill_months:
+                                if bill_month["month"] == bill_day["date"].month and bill_month["year"] == bill_day["date"].year:
+                                    append_to_list = False
+                                    bill_month["value"] += bill_day["value"]
+                                    bill_month["after_expenditure"] += bill_day["value"]
+                                    break
+                            if append_to_list:
+                                bill_months.append({"month": bill_day["date"].month, "year": bill_day["date"].year,
+                                                   "value": bill_day["value"], "after_expenditure": bill_day["after_expenditure"]})
+                    
+                bill_months.sort(key=lambda bill_month: (bill_month["year"],bill_month["month"]))
+                context["bill_months"] = bill_months
+
+            case "week":
+                dates = dates = date_list(start_bill, end_bill)
+                weeks = list({(date - timedelta(days=date.weekday())) for date in dates})
+                bill_weeks = []
+
+                for week in weeks:
+                    for bill_day in bill_days:
+                        if bill_day["date"] - timedelta(days=bill_day["date"].weekday()) == week:
+                            append_to_list = True
+                            for bill_week in bill_weeks:
+                                if bill_week["year"] == bill_day["date"].year and bill_week["week"] == bill_day["date"].isocalendar()[1]:
+                                    append_to_list = False
+                                    bill_week["value"] += bill_day["value"]
+                                    bill_week["after_expenditure"] += bill_day["value"]
+                                    break
+                            
+                            if append_to_list:
+                                bill_weeks.append({"year":week.year,"week":week.isocalendar()[1],
+                                                "value":bill_day["value"],"after_expenditure":bill_day["after_expenditure"]})
+                
+                bill_weeks.sort(key=lambda bill_month: (bill_month["year"],bill_month["week"]))
+                context["bill_weeks"] = bill_weeks
+
 
         return templates.TemplateResponse(
             request=request,

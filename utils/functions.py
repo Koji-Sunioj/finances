@@ -23,13 +23,18 @@ conn = psycopg2.connect(
 )
 cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
+def date_list(start_date, end_date):
+    date_diff = end_date - start_date
+    return [(start_date + timedelta(days=n))for n in range(date_diff.days + 1)]
+
 
 def week_days():
-    return [{"name": "Monday", "value": 0, "selected": False}, {"name": "Tuesday", "value": 1, "selected": False},
-            {"name": "Wednesday", "value": 2, "selected": False}, {
-                "name": "Thursday", "value": 3, "selected": False},
-            {"name": "Friday", "value": 4, "selected": False}, {
-                "name": "Saturday", "value": 5, "selected": False},
+    return [{"name": "Monday", "value": 0, "selected": False},
+            {"name": "Tuesday", "value": 1, "selected": False},
+            {"name": "Wednesday", "value": 2, "selected": False},
+            {"name": "Thursday", "value": 3, "selected": False},
+            {"name": "Friday", "value": 4, "selected": False},
+            {"name": "Saturday", "value": 5, "selected": False},
             {"name": "Sunday", "value": 6, "selected": False}]
 
 
@@ -142,11 +147,13 @@ def bar_chart_image(bill_days):
                            for expenditure in expenditures], color=["g" if expenditure["value"] > 0 else "r" for expenditure in expenditures])
     ax.bar_label(bar_container)
     ax.axhline(y=0, linewidth=1, color='k')
+    ax.grid()
+    ax.tick_params(axis='x', rotation=20)
 
+    plt.subplots_adjust(hspace=0, bottom=0.2)
     plt.title("Expenditures grouped by name")
     plt.xlabel("name")
     plt.ylabel("amount")
-    plt.tight_layout()
 
     buffer = io.BytesIO()
     plt.savefig(buffer, format='png')
@@ -155,16 +162,15 @@ def bar_chart_image(bill_days):
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
-def log_chart_image(expenditures, start_date, end_date):
-    expediture_names = list({expenditure["name"] for expenditure in expenditures})
-    date_diff = end_date - start_date
-    dates = [(start_date + timedelta(days=n)).date() for n in range(date_diff.days +1)]
-
+def log_chart_image(expenditures, dates):
+    expediture_names = list({expenditure["name"]
+                            for expenditure in expenditures})
     logarhythms = []
 
     for expenditure_name in expediture_names:
         values = []
-        selected = [expenditure for expenditure in expenditures if expenditure["name"] == expenditure_name]
+        selected = [
+            expenditure for expenditure in expenditures if expenditure["name"] == expenditure_name]
         for date in dates:
             found = None
             for select in selected:
@@ -177,23 +183,27 @@ def log_chart_image(expenditures, start_date, end_date):
                 values.append(0)
 
         log = []
-        for n,value in enumerate(values):
+        for n, value in enumerate(values):
             if n > 0:
                 log.append(log[n - 1] + value)
             else:
                 log.append(value)
-        
-        logarhythms.append({"name":expenditure_name,"log":log})
+
+        logarhythms.append({"name": expenditure_name, "log": log})
 
     logarhythms.sort(key=lambda log: sum(log['log']), reverse=True)
 
-    fig, axes = plt.subplots(nrows=len(logarhythms),figsize=(10,len(logarhythms) * 2), constrained_layout=True)
+    fig, axes = plt.subplots(nrows=len(logarhythms), figsize=(
+        10, len(logarhythms) * 2), constrained_layout=True)
     fig.suptitle("logarithm(s) for expenditures", fontsize=16)
 
-    for ax,expenditure in zip(axes,logarhythms):
+    for ax, expenditure in zip(axes, logarhythms):
         ax.set_title(expenditure["name"])
         color = "red" if expenditure["log"][-1] < 0 else "#1f77b4"
-        ax.plot(dates,[l for l in expenditure["log"]],label="asd",color=color)
+        ax.plot(dates, [l for l in expenditure["log"]],
+                label="asd", color=color, scalex=True)
+        ax.set_xlim(dates[0], dates[-1])
+        ax.grid()
 
     plt.xlabel("date")
     plt.ylabel("amount")
@@ -204,6 +214,7 @@ def log_chart_image(expenditures, start_date, end_date):
     plt.close()
 
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
 
 def pie_chart_image(expenditures, title):
     ax = plt.subplots()[1]
@@ -230,7 +241,6 @@ def pie_chart_groupings(bill_days, expenditure_names):
 
     total_expenditures = sum([abs(expenditure["value"])
                              for expenditure in expenditures])
-
     small_values = []
 
     for expenditure in expenditures:

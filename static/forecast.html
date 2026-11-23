@@ -1,4 +1,6 @@
-{% extends 'base.html' %} {% block content %}
+{% extends 'base.html' %} 
+{% block content %}
+{% set select_list = view_type == 'list' %}
 <h1>Forecast</h1>
 <p>
   <i
@@ -54,6 +56,34 @@
       />
     </div>
   </div>
+  <p><b>View type:</b></p>
+  <p>
+    <i>for view types other than list, expenditures are grouped together</i>
+  </p>
+  <div class="form-group col-md-4">
+    <select
+      class="form-control"
+      id="view_type"
+      name="view_type"
+      required
+    >
+      {% if view_type == 'list' %}
+        <option value="list" selected>list</option>
+      {% else %}
+        <option value="list">list</option>
+      {% endif %}
+      {% if view_type == 'week' %}
+        <option value="week" selected>week</option>
+      {% else %}
+        <option value="week">week</option>
+      {% endif %}
+      {% if view_type == 'month' %}
+        <option value="month" selected>month</option>
+      {% else %}
+        <option value="month">month</option>
+      {% endif %}
+    </select>
+  </div>
   <p><b>Chart options:</b></p>
   <div class="row">
     <div class="col">
@@ -85,6 +115,34 @@
   </div>
   <button type="submit" class="btn btn-primary">Submit</button>
 </form>
+{% if bar_chart %}
+<hr/>
+<div class="row">
+  <img src="data:image/png;base64,{{ bar_chart | safe }}">
+</div>
+{% endif %}
+
+{% if expenses_pie_chart %}
+<hr/>
+<div class="row">
+  <img src="data:image/png;base64,{{ expenses_pie_chart | safe }}" >
+</div>
+{% endif %}
+
+{% if deposits_pie_chart %}
+<hr/>
+<div class="row">
+  <img src="data:image/png;base64,{{ deposits_pie_chart | safe }}">
+</div>
+{% endif %}
+
+{% if log_chart %}
+<hr/>
+<div class="row">
+  <img src="data:image/png;base64,{{ log_chart | safe }}">
+</div>
+{% endif %}
+
 {% if bill_days %}
 <hr/>
 <h2>Expenditure days</h2>
@@ -117,37 +175,78 @@
         </tbody>
     </table>
 </div>
+{% endif %}
+
+{% if bill_months %}
+<hr/>
+<h2>Expenditure months</h2>
+{% set headers =['year','month','total','balance'] %}
+<div class="row">
+  <table class="table">
+      <thead>
+          {% for header in headers %}
+              <th scope="col">{{ header }}</th>
+          {% endfor %}
+      </thead>
+      <tbody>
+      {% for bill_month in bill_months %}
+          <tr>
+              <td>{{ bill_month.year }}</td>
+              <td>{{ bill_month.month }}</td>
+              {% if bill_month.value > 0 %}
+                <td style="color: green;">+{{ bill_month.value | round(2) }}</td>
+              {% else %}
+                <td style="color: red;">{{ bill_month.value | round(2) }}</td>
+              {% endif %}
+              {% if bill_month.after_expenditure > 0 %}
+                <td style="color: green;">+{{ bill_month.after_expenditure | round(2) }}</td>
+              {% else %}
+                <td style="color: red;">{{ bill_month.after_expenditure | round(2) }}</td>
+              {% endif %}
+          </tr>
+      {% endfor %}
+      </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if bill_weeks %}
+<hr/>
+<h2>Expenditure months</h2>
+{% set headers =['year','week','total','balance'] %}
+<div class="row">
+  <table class="table">
+      <thead>
+          {% for header in headers %}
+              <th scope="col">{{ header }}</th>
+          {% endfor %}
+      </thead>
+      <tbody>
+      {% for bill_week in bill_weeks %}
+          <tr>
+              <td>{{ bill_week.year }}</td>
+              <td>{{ bill_week.week }}</td>
+              {% if bill_week.value > 0 %}
+                <td style="color: green;">+{{ bill_week.value | round(2) }}</td>
+              {% else %}
+                <td style="color: red;">{{ bill_week.value | round(2) }}</td>
+              {% endif %}
+              {% if bill_week.after_expenditure > 0 %}
+                <td style="color: green;">+{{ bill_week.after_expenditure | round(2) }}</td>
+              {% else %}
+                <td style="color: red;">{{ bill_week.after_expenditure | round(2) }}</td>
+              {% endif %}
+          </tr>
+      {% endfor %}
+      </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if ending_balance and deposits and expenses %}
 <p><b>ending balance: {{ ending_balance | round(2) }}</b></p>
 <p><b>deposits: {{ deposits | round(2) }}</b></p>
-<p><b>expenses: {{ expenses | round(2) }}</b></p>
-{% endif %}
-
-{% if bar_chart %}
-<hr/>
-<div class="row">
-  <img src="data:image/png;base64,{{ bar_chart | safe }}">
-</div>
-{% endif %}
-
-{% if expenses_pie_chart %}
-<hr/>
-<div class="row">
-  <img src="data:image/png;base64,{{ expenses_pie_chart | safe }}" >
-</div>
-{% endif %}
-
-{% if deposits_pie_chart %}
-<hr/>
-<div class="row">
-  <img src="data:image/png;base64,{{ deposits_pie_chart | safe }}">
-</div>
-{% endif %}
-
-{% if log_chart %}
-<hr/>
-<div class="row">
-  <img src="data:image/png;base64,{{ log_chart | safe }}">
-</div>
+<p><b>expenses: {{ expenses | round(2) }}</b></p> 
 {% endif %}
 
 {% endblock %}
