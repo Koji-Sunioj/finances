@@ -7,7 +7,6 @@ from utils.functions import (
     date_list,
     real_value,
     week_to_date,
-    month_from_cycle,
     bar_chart_image,
     pie_chart_image,
     log_chart_image,
@@ -167,17 +166,15 @@ async def get_forecast(request: Request, start_date: str = None, end_date: str =
                     pie_chart_deposits, "deposits")
 
         if log_chart == "on":
-            dates = date_list(start_bill, end_bill)
-            context["log_chart"] = log_chart_image(bill_days, dates)
+            context["log_chart"] = log_chart_image(bill_days, date_list(start_bill, end_bill))
 
         match view_type:
             case "list":
                 context["bill_days"] = bill_days
 
             case "month":
-                dates = dates = date_list(start_bill, end_bill)
                 year_months = list(
-                    {str(date.year)+"-"+str(date.month) for date in dates})
+                    {str(date.year)+"-"+str(date.month) for date in date_list(start_bill, end_bill)})
                 bill_months = []
 
                 for year_month in year_months:
@@ -198,8 +195,7 @@ async def get_forecast(request: Request, start_date: str = None, end_date: str =
                 context["bill_months"] = bill_months
 
             case "week":
-                dates = dates = date_list(start_bill, end_bill)
-                weeks = list({(date - timedelta(days=date.weekday())) for date in dates})
+                weeks = list({(date - timedelta(days=date.weekday())) for date in date_list(start_bill, end_bill)})
                 bill_weeks = []
 
                 for week in weeks:

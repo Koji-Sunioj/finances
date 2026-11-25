@@ -316,8 +316,3 @@ def week_to_date(week, year):
         week_one = week_one + timedelta(days=7)
 
     return week_one + timedelta(days=(week-1)*7)
-
-
-def month_from_cycle(month, n_months):
-    month = month + timedelta(days=31*(n_months-1))
-    return month - timedelta(days=month.day-1)
