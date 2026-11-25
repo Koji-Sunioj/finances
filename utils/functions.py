@@ -37,6 +37,9 @@ def week_days():
             {"name": "Saturday", "value": 5, "selected": False},
             {"name": "Sunday", "value": 6, "selected": False}]
 
+def real_value(expenditure_type: str, value: float):
+    return -value if expenditure_type == "expense" else value
+
 
 def month_days():
     return [{"value": n, "selected": False} for n in range(1, 32)]

@@ -5,6 +5,7 @@ from utils.functions import (
     tx,
     cursor,
     date_list,
+    real_value,
     week_to_date,
     month_from_cycle,
     bar_chart_image,
@@ -13,6 +14,7 @@ from utils.functions import (
     pie_chart_groupings
 )
 
+import math
 import datetime
 from pprint import pprint
 from datetime import timedelta, date, datetime
@@ -56,13 +58,14 @@ async def get_forecast(request: Request, start_date: str = None, end_date: str =
         dailys = cursor.fetchall()
 
         for daily in dailys:
-            target_end = daily["end_date"] if daily["end_date"] != None and daily["end_date"] <= end_bill else end_bill
-            value = daily["value"] if daily["type"] == "deposit" else (
-                - daily["value"])
+            use_end_date = daily["end_date"] != None and daily["end_date"] <= end_bill
+            target_end = daily["end_date"] if use_end_date else end_bill
+            value = real_value(daily["type"],daily["value"])
 
             n_days = int((target_end - daily["start_date"]).days) + 1
             for n in range(n_days):
                 bill_day = daily["start_date"] + timedelta(days=n)
+                
                 if start_bill <= bill_day <= target_end:
                     bill_days.append({"type": "daily",
                                       "expenditure_id": daily["expenditure_id"],
@@ -79,30 +82,27 @@ async def get_forecast(request: Request, start_date: str = None, end_date: str =
         cursor.execute(select_weeklys, (request.state.user_id,))
         weeklys = cursor.fetchall()
 
-        end_week_view = end_bill - \
-            timedelta(days=end_bill.weekday()) + timedelta(days=6)
-
         for weekly in weeklys:
-            week = int(weekly["start_week"])
-            year = int(weekly["start_year"])
+            n_weeks = None
+            week_one = week_to_date(int(weekly["start_week"]), int(weekly["start_year"]))
+            value = real_value(weekly["type"],weekly["value"])
+        
+            if weekly["cycles"] != None:
+                n_weeks = weekly["cycles"]
+            else:
+                n_weeks = math.ceil(((end_bill - week_one).days + 1) / 7 )
 
-            target_week = week_to_date(week, year)
-            value = weekly["value"] if weekly["type"] == "deposit" else (
-                - weekly["value"])
-
-            if target_week < end_week_view:
-                n_weeks = int((end_week_view + timedelta(days=1) - target_week).days /
-                              7) if weekly["cycles"] == None else int(weekly["cycles"])
-                for i in range(n_weeks):
-                    new_week = target_week+timedelta(days=7*i)
-                    for day in weekly["days"]:
-                        bill_day = new_week + timedelta(days=int(day))
-                        if start_bill <= bill_day <= end_bill:
-                            bill_days.append({"type": "weekly",
+            for n in range(n_weeks):
+                next_week = week_one + timedelta(days=n * 7)
+                for day in weekly["days"]:
+                    bill_date = next_week + timedelta(days=day)
+                    
+                    if start_bill <= bill_date <= end_bill:
+                        bill_days.append({"type": "weekly",
                                               "expenditure_id": weekly["expenditure_id"],
                                               "value": value,
                                               "name": weekly["name"],
-                                              "date": bill_day})
+                                              "date": bill_date})
 
         select_monthlys = "select expenditures.expenditure_id,value::float,name,type,start_month,start_year,cycles,json_agg(month_day) days from monthlys \
             join expenditures on expenditures.expenditure_id = monthlys.expenditure_id \
@@ -111,30 +111,17 @@ async def get_forecast(request: Request, start_date: str = None, end_date: str =
         cursor.execute(select_monthlys, (request.state.user_id,))
         monthlys = cursor.fetchall()
 
-        end_month_view = end_bill - timedelta(end_bill.day-1)
 
         for monthly in monthlys:
-            first_month = date(monthly["start_year"],
-                               monthly["start_month"], 1)
-            value = monthly["value"] if monthly["type"] == "deposit" else (
-                - monthly["value"])
-            bill_months = []
-
-            if first_month <= end_month_view:
-                last_month = end_month_view if monthly["cycles"] == None else month_from_cycle(
-                    first_month, int(monthly["cycles"]))
-                n_days = range((last_month - first_month).days+1)
-
-                for n in n_days:
-                    bill_month = first_month + timedelta(days=n)
-
-                    if bill_month.day == 1:
-                        bill_months.append(bill_month)
-
-            for bill_month in bill_months:
+            month_one = date(monthly["start_year"], monthly["start_month"], 1)
+            months = [date for date in date_list(month_one, end_bill) if date.day == 1][:monthly["cycles"]]
+            value = real_value(monthly["type"],monthly["value"])
+            for month in months:
                 for day in monthly["days"]:
-                    bill_day = bill_month + timedelta(days=day-1)
-                    if bill_day.month == bill_month.month and start_bill <= bill_day <= end_bill:
+                    bill_day = date(month.year,month.month,1)
+                    bill_day += timedelta(days=day-1)
+                    
+                    if start_bill <= bill_day <= end_bill and bill_day.month == month.month:
                         bill_days.append({"type": "monthly",
                                           "expenditure_id": monthly["expenditure_id"],
                                           "value": value,
