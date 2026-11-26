@@ -12,6 +12,8 @@ from traceback import format_exc
 from fastapi import Request, HTTPException
 from datetime import datetime, timedelta, timezone, date
 
+from pprint import pprint
+
 fe_key = os.getenv("FE_KEY")
 
 conn = psycopg2.connect(
@@ -22,6 +24,7 @@ conn = psycopg2.connect(
     port=5432,
 )
 cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
 
 def date_list(start_date, end_date):
     date_diff = end_date - start_date
@@ -36,6 +39,7 @@ def week_days():
             {"name": "Friday", "value": 4, "selected": False},
             {"name": "Saturday", "value": 5, "selected": False},
             {"name": "Sunday", "value": 6, "selected": False}]
+
 
 def real_value(expenditure_type: str, value: float):
     return -value if expenditure_type == "expense" else value
@@ -146,15 +150,13 @@ def bar_chart_image(bill_days):
     expenditures.sort(key=lambda expenditure: expenditure['value'])
 
     ax = plt.subplots()[1]
-    bar_container = ax.bar([expenditure["name"] for expenditure in expenditures], [expenditure["value"]
-                           for expenditure in expenditures], color=["g" if expenditure["value"] > 0 else "r" for expenditure in expenditures])
-    ax.bar_label(bar_container)
-    ax.axhline(y=0, linewidth=1, color='k')
+    ax.barh([expenditure["name"] for expenditure in expenditures], [expenditure["value"]
+                                                                    for expenditure in expenditures], color=["g" if expenditure["value"] > 0 else "r" for expenditure in expenditures])
     ax.grid()
     ax.tick_params(axis='x', rotation=20)
 
     plt.subplots_adjust(hspace=0, bottom=0.2)
-    plt.title("Expenditures grouped by name")
+    plt.title("expenditures grouped by name")
     plt.xlabel("name")
     plt.ylabel("amount")
 
@@ -165,49 +167,28 @@ def bar_chart_image(bill_days):
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
-def log_chart_image(expenditures, dates):
-    expediture_names = list({expenditure["name"]
-                            for expenditure in expenditures})
-    logarhythms = []
+def balance_line(bill_days, dates, balance):
+    log_days = [{"date": date, "value": 0} for date in dates]
 
-    for expenditure_name in expediture_names:
-        values = []
-        selected = [
-            expenditure for expenditure in expenditures if expenditure["name"] == expenditure_name]
-        for date in dates:
-            found = None
-            for select in selected:
-                if select["date"] == date:
-                    found = select
-                    break
-            if found:
-                values.append(found["value"])
-            else:
-                values.append(0)
+    for n, log_day in enumerate(log_days):
+        for bill_day in bill_days:
+            if bill_day["date"] == log_day["date"]:
+                log_day["value"] += bill_day["value"]
+        if n > 0:
+            log_day["value"] += log_days[n - 1]["value"]
 
-        log = []
-        for n, value in enumerate(values):
-            if n > 0:
-                log.append(log[n - 1] + value)
-            else:
-                log.append(value)
+    pprint(log_days)
 
-        logarhythms.append({"name": expenditure_name, "log": log})
+    ax = plt.subplots()[1]
+    ax.plot(dates, [log_day["value"] + balance for log_day in log_days])
+    ax.set_xlim(dates[0], dates[-1])
+    ax.grid()
+    ax.tick_params(axis='x', rotation=20)
 
-    logarhythms.sort(key=lambda log: sum(log['log']), reverse=True)
+    if len(log_days) >= 10:
+        ax.xaxis.set_major_locator(plt.MaxNLocator(8))
 
-    fig, axes = plt.subplots(nrows=len(logarhythms), figsize=(
-        10, len(logarhythms) * 2), constrained_layout=True)
-    fig.suptitle("logarithm(s) for expenditures", fontsize=16)
-
-    for ax, expenditure in zip(axes, logarhythms):
-        ax.set_title(expenditure["name"])
-        color = "red" if expenditure["log"][-1] < 0 else "#1f77b4"
-        ax.plot(dates, [l for l in expenditure["log"]],
-                label="asd", color=color, scalex=True)
-        ax.set_xlim(dates[0], dates[-1])
-        ax.grid()
-
+    plt.title("balance over time")
     plt.xlabel("date")
     plt.ylabel("amount")
     plt.tight_layout()

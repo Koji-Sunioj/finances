@@ -9,7 +9,7 @@ from utils.functions import (
     week_to_date,
     bar_chart_image,
     pie_chart_image,
-    log_chart_image,
+    balance_line,
     pie_chart_groupings
 )
 
@@ -59,12 +59,12 @@ async def get_forecast(request: Request, start_date: str = None, end_date: str =
         for daily in dailys:
             use_end_date = daily["end_date"] != None and daily["end_date"] <= end_bill
             target_end = daily["end_date"] if use_end_date else end_bill
-            value = real_value(daily["type"],daily["value"])
+            value = real_value(daily["type"], daily["value"])
 
             n_days = int((target_end - daily["start_date"]).days) + 1
             for n in range(n_days):
                 bill_day = daily["start_date"] + timedelta(days=n)
-                
+
                 if start_bill <= bill_day <= target_end:
                     bill_days.append({"type": "daily",
                                       "expenditure_id": daily["expenditure_id"],
@@ -83,25 +83,26 @@ async def get_forecast(request: Request, start_date: str = None, end_date: str =
 
         for weekly in weeklys:
             n_weeks = None
-            week_one = week_to_date(int(weekly["start_week"]), int(weekly["start_year"]))
-            value = real_value(weekly["type"],weekly["value"])
-        
+            week_one = week_to_date(
+                int(weekly["start_week"]), int(weekly["start_year"]))
+            value = real_value(weekly["type"], weekly["value"])
+
             if weekly["cycles"] != None:
                 n_weeks = weekly["cycles"]
             else:
-                n_weeks = math.ceil(((end_bill - week_one).days + 1) / 7 )
+                n_weeks = math.ceil(((end_bill - week_one).days + 1) / 7)
 
             for n in range(n_weeks):
                 next_week = week_one + timedelta(days=n * 7)
                 for day in weekly["days"]:
                     bill_date = next_week + timedelta(days=day)
-                    
+
                     if start_bill <= bill_date <= end_bill:
                         bill_days.append({"type": "weekly",
-                                              "expenditure_id": weekly["expenditure_id"],
-                                              "value": value,
-                                              "name": weekly["name"],
-                                              "date": bill_date})
+                                          "expenditure_id": weekly["expenditure_id"],
+                                          "value": value,
+                                          "name": weekly["name"],
+                                          "date": bill_date})
 
         select_monthlys = "select expenditures.expenditure_id,value::float,name,type,start_month,start_year,cycles,json_agg(month_day) days from monthlys \
             join expenditures on expenditures.expenditure_id = monthlys.expenditure_id \
@@ -110,16 +111,16 @@ async def get_forecast(request: Request, start_date: str = None, end_date: str =
         cursor.execute(select_monthlys, (request.state.user_id,))
         monthlys = cursor.fetchall()
 
-
         for monthly in monthlys:
             month_one = date(monthly["start_year"], monthly["start_month"], 1)
-            months = [date for date in date_list(month_one, end_bill) if date.day == 1][:monthly["cycles"]]
-            value = real_value(monthly["type"],monthly["value"])
+            months = [date for date in date_list(
+                month_one, end_bill) if date.day == 1][:monthly["cycles"]]
+            value = real_value(monthly["type"], monthly["value"])
             for month in months:
                 for day in monthly["days"]:
-                    bill_day = date(month.year,month.month,1)
+                    bill_day = date(month.year, month.month, 1)
                     bill_day += timedelta(days=day-1)
-                    
+
                     if start_bill <= bill_day <= end_bill and bill_day.month == month.month:
                         bill_days.append({"type": "monthly",
                                           "expenditure_id": monthly["expenditure_id"],
@@ -166,7 +167,8 @@ async def get_forecast(request: Request, start_date: str = None, end_date: str =
                     pie_chart_deposits, "deposits")
 
         if log_chart == "on":
-            context["log_chart"] = log_chart_image(bill_days, date_list(start_bill, end_bill))
+            context["log_chart"] = balance_line(
+                bill_days, date_list(start_bill, end_bill), balance)
 
         match view_type:
             case "list":
@@ -190,12 +192,14 @@ async def get_forecast(request: Request, start_date: str = None, end_date: str =
                             if append_to_list:
                                 bill_months.append({"month": bill_day["date"].month, "year": bill_day["date"].year,
                                                    "value": bill_day["value"], "after_expenditure": bill_day["after_expenditure"]})
-                    
-                bill_months.sort(key=lambda bill_month: (bill_month["year"],bill_month["month"]))
+
+                bill_months.sort(key=lambda bill_month: (
+                    bill_month["year"], bill_month["month"]))
                 context["bill_months"] = bill_months
 
             case "week":
-                weeks = list({(date - timedelta(days=date.weekday())) for date in date_list(start_bill, end_bill)})
+                weeks = list({(date - timedelta(days=date.weekday()))
+                             for date in date_list(start_bill, end_bill)})
                 bill_weeks = []
 
                 for week in weeks:
@@ -208,14 +212,14 @@ async def get_forecast(request: Request, start_date: str = None, end_date: str =
                                     bill_week["value"] += bill_day["value"]
                                     bill_week["after_expenditure"] += bill_day["value"]
                                     break
-                            
-                            if append_to_list:
-                                bill_weeks.append({"year":week.year,"week":week.isocalendar()[1],
-                                                "value":bill_day["value"],"after_expenditure":bill_day["after_expenditure"]})
-                
-                bill_weeks.sort(key=lambda bill_month: (bill_month["year"],bill_month["week"]))
-                context["bill_weeks"] = bill_weeks
 
+                            if append_to_list:
+                                bill_weeks.append({"year": week.year, "week": week.isocalendar()[1],
+                                                   "value": bill_day["value"], "after_expenditure": bill_day["after_expenditure"]})
+
+                bill_weeks.sort(key=lambda bill_month: (
+                    bill_month["year"], bill_month["week"]))
+                context["bill_weeks"] = bill_weeks
 
         return templates.TemplateResponse(
             request=request,
