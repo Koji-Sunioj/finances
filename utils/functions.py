@@ -31,6 +31,63 @@ def date_list(start_date, end_date):
     return [(start_date + timedelta(days=n))for n in range(date_diff.days + 1)]
 
 
+def group_by_date_type(type: str, bill_days: list, dates: list):
+    same_date, increment_existing, indexes, group = None, None, None, None
+
+    match type:
+        case "month":
+            indexes = list({date - timedelta(days=date.day - 1)
+                           for date in dates})
+
+            def same_date(bill_day, index): return bill_day["date"] - timedelta(
+                days=bill_day["date"].day - 1) == index
+
+            def increment_existing(
+                bill_group, bill_day): return bill_group["month"] == bill_day["date"].month and bill_group["year"] == bill_day["date"].year
+
+            def group(bill_day): return {
+                "month": bill_day["date"].month, "year": bill_day["date"].year}
+        case "week":
+            indexes = list({(date - timedelta(days=date.weekday()))
+                           for date in dates})
+
+            def same_date(bill_day, index): return bill_day["date"] - timedelta(
+                days=bill_day["date"].weekday()) == index
+
+            def increment_existing(bill_week, bill_day): return bill_week["year"] == (bill_day["date"] - timedelta(
+                days=bill_day["date"].weekday())).year and bill_week["week"] == bill_day["date"].isocalendar()[1]
+
+            def group(bill_day): return {"week": bill_day["date"].isocalendar()[
+                1], "year": bill_day["date"].year}
+
+    bill_groups = []
+
+    for index in indexes:
+        for bill_day in bill_days:
+            if same_date(bill_day, index):
+                append_to_list = True
+                deposits, expenses = 0, 0
+                if bill_day["value"] < 0:
+                    expenses += bill_day["value"]
+                elif bill_day["value"] > 0:
+                    deposits += bill_day["value"]
+                for bill_group in bill_groups:
+                    if increment_existing(bill_group, bill_day):
+                        append_to_list = False
+                        bill_group["expenses"] += expenses
+                        bill_group["deposits"] += deposits
+                        bill_group["after_expenditure"] += bill_day["value"]
+                        break
+                if append_to_list:
+                    new_group = group(bill_day)
+                    new_group["expenses"] = expenses
+                    new_group["deposits"] = deposits
+                    new_group["after_expenditure"] = bill_day["after_expenditure"]
+                    bill_groups.append(new_group)
+
+    return bill_groups
+
+
 def week_days():
     return [{"name": "Monday", "value": 0, "selected": False},
             {"name": "Tuesday", "value": 1, "selected": False},

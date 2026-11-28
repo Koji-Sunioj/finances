@@ -10,7 +10,8 @@ from utils.functions import (
     bar_chart_image,
     pie_chart_image,
     balance_line,
-    pie_chart_groupings
+    pie_chart_groupings,
+    group_by_date_type
 )
 
 import math
@@ -175,48 +176,15 @@ async def get_forecast(request: Request, start_date: str = None, end_date: str =
                 context["bill_days"] = bill_days
 
             case "month":
-                year_months = list(
-                    {str(date.year)+"-"+str(date.month) for date in date_list(start_bill, end_bill)})
-                bill_months = []
-
-                for year_month in year_months:
-                    for bill_day in bill_days:
-                        if str(bill_day["date"].year)+"-"+str(bill_day["date"].month) == year_month:
-                            append_to_list = True
-                            for bill_month in bill_months:
-                                if bill_month["month"] == bill_day["date"].month and bill_month["year"] == bill_day["date"].year:
-                                    append_to_list = False
-                                    bill_month["value"] += bill_day["value"]
-                                    bill_month["after_expenditure"] += bill_day["value"]
-                                    break
-                            if append_to_list:
-                                bill_months.append({"month": bill_day["date"].month, "year": bill_day["date"].year,
-                                                   "value": bill_day["value"], "after_expenditure": bill_day["after_expenditure"]})
-
+                bill_months = group_by_date_type(
+                    "month", bill_days, date_list(start_bill, end_bill))
                 bill_months.sort(key=lambda bill_month: (
                     bill_month["year"], bill_month["month"]))
                 context["bill_months"] = bill_months
 
             case "week":
-                weeks = list({(date - timedelta(days=date.weekday()))
-                             for date in date_list(start_bill, end_bill)})
-                bill_weeks = []
-
-                for week in weeks:
-                    for bill_day in bill_days:
-                        if bill_day["date"] - timedelta(days=bill_day["date"].weekday()) == week:
-                            append_to_list = True
-                            for bill_week in bill_weeks:
-                                if bill_week["year"] == bill_day["date"].year and bill_week["week"] == bill_day["date"].isocalendar()[1]:
-                                    append_to_list = False
-                                    bill_week["value"] += bill_day["value"]
-                                    bill_week["after_expenditure"] += bill_day["value"]
-                                    break
-
-                            if append_to_list:
-                                bill_weeks.append({"year": week.year, "week": week.isocalendar()[1],
-                                                   "value": bill_day["value"], "after_expenditure": bill_day["after_expenditure"]})
-
+                bill_weeks = group_by_date_type(
+                    "week", bill_days, date_list(start_bill, end_bill))
                 bill_weeks.sort(key=lambda bill_month: (
                     bill_month["year"], bill_month["week"]))
                 context["bill_weeks"] = bill_weeks

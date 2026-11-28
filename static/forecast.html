@@ -1,5 +1,6 @@
 {% extends 'base.html' %} 
 {% block content %}
+{% import 'macros.html' as macros %}
 {% set select_list = view_type == 'list' %}
 <h1>Forecast</h1>
 <p>
@@ -73,14 +74,14 @@
         <option value="list">list</option>
       {% endif %}
       {% if view_type == 'week' %}
-        <option value="week" selected>week</option>
+        <option value="week" selected>list - grouped by week</option>
       {% else %}
-        <option value="week">week</option>
+        <option value="week">list - grouped by week</option>
       {% endif %}
       {% if view_type == 'month' %}
-        <option value="month" selected>month</option>
+        <option value="month" selected>list - grouped by month</option>
       {% else %}
-        <option value="month">month</option>
+        <option value="month">list - grouped by month</option>
       {% endif %}
     </select>
   </div>
@@ -159,16 +160,8 @@
             <tr>
                 <td>{{ bill_day.date }}</td>
                 <td>{{ bill_day.name }}</td>
-                {% if bill_day.value > 0 %}
-                  <td style="color: green;">+{{ bill_day.value }}</td>
-                {% else %}
-                  <td style="color: red;">{{ bill_day.value }}</td>
-                {% endif %}
-                {% if bill_day.after_expenditure > 0 %}
-                  <td style="color: green;">+{{ bill_day.after_expenditure | round(2) }}</td>
-                {% else %}
-                  <td style="color: red;">{{ bill_day.after_expenditure | round(2) }}</td>
-                {% endif %}
+                {{ macros.colored_td(bill_day.value) }}
+                {{ macros.colored_td(bill_day.after_expenditure) }}
                 <td>{{ bill_day.type }}</td>
             </tr>
         {% endfor %}
@@ -180,7 +173,7 @@
 {% if bill_months %}
 <hr/>
 <h2>Expenditure months</h2>
-{% set headers =['year','month','total','balance'] %}
+{% set headers =['year','month','deposits','expenses','balance'] %}
 <div class="row">
   <table class="table">
       <thead>
@@ -193,16 +186,9 @@
           <tr>
               <td>{{ bill_month.year }}</td>
               <td>{{ bill_month.month }}</td>
-              {% if bill_month.value > 0 %}
-                <td style="color: green;">+{{ bill_month.value | round(2) }}</td>
-              {% else %}
-                <td style="color: red;">{{ bill_month.value | round(2) }}</td>
-              {% endif %}
-              {% if bill_month.after_expenditure > 0 %}
-                <td style="color: green;">+{{ bill_month.after_expenditure | round(2) }}</td>
-              {% else %}
-                <td style="color: red;">{{ bill_month.after_expenditure | round(2) }}</td>
-              {% endif %}
+              {{ macros.colored_td(bill_month.deposits) }}
+              {{ macros.colored_td(bill_month.expenses) }}
+              {{ macros.colored_td(bill_month.after_expenditure) }}
           </tr>
       {% endfor %}
       </tbody>
@@ -212,8 +198,8 @@
 
 {% if bill_weeks %}
 <hr/>
-<h2>Expenditure months</h2>
-{% set headers =['year','week','total','balance'] %}
+<h2>Expenditure weeks</h2>
+{% set headers =['year','week','deposits','expenses','balance'] %}
 <div class="row">
   <table class="table">
       <thead>
@@ -226,16 +212,9 @@
           <tr>
               <td>{{ bill_week.year }}</td>
               <td>{{ bill_week.week }}</td>
-              {% if bill_week.value > 0 %}
-                <td style="color: green;">+{{ bill_week.value | round(2) }}</td>
-              {% else %}
-                <td style="color: red;">{{ bill_week.value | round(2) }}</td>
-              {% endif %}
-              {% if bill_week.after_expenditure > 0 %}
-                <td style="color: green;">+{{ bill_week.after_expenditure | round(2) }}</td>
-              {% else %}
-                <td style="color: red;">{{ bill_week.after_expenditure | round(2) }}</td>
-              {% endif %}
+              {{ macros.colored_td(bill_week.deposits) }}
+              {{ macros.colored_td(bill_week.expenses) }}
+              {{ macros.colored_td(bill_week.after_expenditure) }}
           </tr>
       {% endfor %}
       </tbody>

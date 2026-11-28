@@ -1,0 +1,10 @@
+{# The macro definition #}
+{% macro colored_td(value) -%}
+    {% if value > 0 %}
+        <td style="color: green;">+{{ value | round(2) }}</td>
+    {% else %}
+        <td style="color: red;">{{ value | round(2) }}</td>
+    {% endif %}
+{%- endmacro %}
+
+{# Calling the macro with and without arguments #}
